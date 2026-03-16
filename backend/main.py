@@ -11,6 +11,7 @@ from jose import JWTError, jwt
 import os, json
 from datetime import datetime, timezone
 from collections import defaultdict
+
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="ChatConnect API", version="2.0.0")
@@ -34,10 +35,9 @@ app.include_router(messages.router, prefix="/api/messages", tags=["messages"])
 app.include_router(calls.router, prefix="/api/calls", tags=["calls"])
 app.include_router(notifications.router, prefix="/api/notifications", tags=["notifications"])
 app.include_router(admin.router, prefix="/api/admin", tags=["admin"])
-# ── WebSocket Connection Manager ───────────────────────────────────────────────
+
 class ConnectionManager:
     def __init__(self):
-        # user_id -> list of WebSocket connections
         self.active: dict[str, list[WebSocket]] = defaultdict(list)
 
     async def connect(self, websocket: WebSocket, user_id: str):
@@ -66,7 +66,6 @@ class ConnectionManager:
             await self.send_to_user(uid, data)
 
 manager = ConnectionManager()
-
 SECRET_KEY = os.getenv("SECRET_KEY", "chatconnect-super-secret-key-change-in-production")
 
 def get_user_from_token(token: str, db: Session) -> User | None:
@@ -78,7 +77,6 @@ def get_user_from_token(token: str, db: Session) -> User | None:
         return db.query(User).filter(User.id == user_id).first()
     except JWTError:
         return None
-
 
 @app.websocket("/ws")
 async def websocket_endpoint(
@@ -94,14 +92,12 @@ async def websocket_endpoint(
     user_id = user.id
     await manager.connect(websocket, user_id)
 
-    # Update last_seen and status (preserve custom states like busy/dnd on reconnect)
     if not user.status or user.status == "offline":
         user.status = "online"
 
     user.last_seen = datetime.now(timezone.utc)
     db.commit()
 
-    # Broadcast their current presence to all connected users
     await manager.broadcast_to_users(
         [uid for uid in manager.online_users() if uid != user_id],
         {"type": "presence", "userId": user_id, "status": user.status, "lastSeen": user.last_seen.isoformat() + "Z"}
@@ -126,7 +122,6 @@ async def websocket_endpoint(
                 })
 
             elif event == "message":
-                # Real-time message delivery
                 target_ids = data.get("targetUserIds", [])
                 await manager.broadcast_to_users(target_ids, {
                     "type": "message",
@@ -134,7 +129,6 @@ async def websocket_endpoint(
                 })
 
             elif event == "read":
-                # Read receipt
                 target_ids = data.get("targetUserIds", [])
                 await manager.broadcast_to_users(target_ids, {
                     "type": "read",
@@ -145,15 +139,13 @@ async def websocket_endpoint(
 
             elif event in ["call-offer", "call-answer", "call-ice-candidate", "call-end"]:
                 target_ids = data.get("targetUserIds", [])
-                payload = dict(data)  # Copy everything
+                payload = dict(data)
                 payload["type"] = event
                 payload["callerId"] = user_id
                 await manager.broadcast_to_users(target_ids, payload)
 
     except WebSocketDisconnect:
         manager.disconnect(websocket, user_id)
-        
-        # Only broadcast offline if NO other tabs/sockets are still open
         if user_id not in manager.active:
             try:
                 from database import SessionLocal
@@ -164,7 +156,7 @@ async def websocket_endpoint(
                         u.last_seen = datetime.now(timezone.utc)
                         fresh_db.commit()
             except Exception:
-                pass  # Offline status update failed, non-critical
+                pass
 
             last_seen_str = datetime.now(timezone.utc).isoformat() + "Z"
             await manager.broadcast_to_users(
@@ -172,26 +164,21 @@ async def websocket_endpoint(
                 {"type": "presence", "userId": user_id, "status": "offline", "lastSeen": last_seen_str}
             )
 
-
-# Expose manager so routers can push events
 app.state.ws_manager = manager
 
-
 @app.get("/health")
-@app.get("/api/health")  # Redux DevTools / browser extensions may call /api/health
-def health(debug: str = None):  # Accept and ignore debug param from Redux DevTools
+@app.get("/api/health")
+def health(debug: str = None):
     return {"status": "ok", "online_users": len(manager.online_users())}
 
 @app.get("/api/online-users")
 def online_users():
     return {"onlineUsers": manager.online_users()}
 
-# Robust frontend path calculation
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 FRONTEND_BUILD_DIR = os.path.abspath(os.path.join(BASE_DIR, "..", "frontend", "build"))
 STATIC_DIR = os.path.join(FRONTEND_BUILD_DIR, "static")
 
-# Try to mount the static files
 try:
     if os.path.exists(STATIC_DIR):
         app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
@@ -200,9 +187,7 @@ except RuntimeError:
 
 @app.get("/{full_path:path}")
 async def serve_frontend(full_path: str):
-    # NEVER intercept API calls or Docs! Let FastAPI's default 404/Routers handle them
     if not full_path or full_path.startswith("api/") or full_path in ["docs", "redoc", "openapi.json"] or full_path.startswith("docs/"):
-        # This handles the root path and API/Docs
         if not full_path:
             index_path = os.path.join(FRONTEND_BUILD_DIR, "index.html")
             if os.path.isfile(index_path):
@@ -211,15 +196,12 @@ async def serve_frontend(full_path: str):
         from fastapi import HTTPException
         raise HTTPException(status_code=404, detail="Not Found")
 
-    # If they are asking for a specific file like favicon.ico
     requested_file = os.path.join(FRONTEND_BUILD_DIR, full_path)
     if os.path.isfile(requested_file):
         return FileResponse(requested_file)
 
-    # Otherwise, fallback to serving React's index.html for SPA routing
     index_path = os.path.join(FRONTEND_BUILD_DIR, "index.html")
     if os.path.isfile(index_path):
         return FileResponse(index_path)
         
-    return {"message": "ChatConnect API v2 is running on Azure, but the frontend build is missing."}#   D e p l o y m e n t   S y n c  
- 
+    return {"message": "ChatConnect API v2 is running on Azure, but the frontend build is missing."}

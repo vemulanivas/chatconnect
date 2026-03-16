@@ -5,12 +5,14 @@ chatconnect.db
 
 # Python
 __pycache__/
+**/__pycache__/
 *.py[cod]
 *$py.class
+*.pyc
 venv/
 .env
 
 # Frontend
 frontend/node_modules/
-frontend/build/
+# frontend/build/
 .DS_Store
