@@ -183,29 +183,30 @@ def online_users():
 import os
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
-from fastapi import Request
 
-# 1. Mount the React static directory (for chunked JS, CSS, Media)
-static_dir = os.path.join(os.path.dirname(__file__), "../frontend/build/static")
-if os.path.exists(static_dir):
-    app.mount("/static", StaticFiles(directory=static_dir), name="static")
+# Try to mount the static files exactly as they were before, but trap the error if the folder is missing during deployment
+try:
+    if os.path.exists("../frontend/build/static"):
+        app.mount("/static", StaticFiles(directory="../frontend/build/static"), name="static")
+except RuntimeError:
+    pass
 
-# 2. Catch-all route to serve the SPA
 @app.get("/{full_path:path}")
-async def serve_frontend(full_path: str, request: Request):
-    frontend_build_dir = os.path.join(os.path.dirname(__file__), "../frontend/build")
-    
-    # Try to serve a specific file requested from the root (like favicon.ico, manifest.json, robots.txt)
-    requested_file = os.path.join(frontend_build_dir, full_path)
+async def serve_frontend(full_path: str):
+    # NEVER intercept API calls or Docs! Let FastAPI's default 404/Routers handle them
+    if full_path.startswith("api/") or full_path in ["docs", "redoc", "openapi.json"] or full_path.startswith("docs/"):
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail="Not Found")
+
+    # If they are asking for a specific file like favicon.ico
+    requested_file = os.path.join("../frontend/build", full_path)
     if os.path.isfile(requested_file):
         return FileResponse(requested_file)
-    
-    # Otherwise, if it's NOT an API call, serve React's index.html and let React Router handle it
-    if not full_path.startswith("api/"):
-        index_path = os.path.join(frontend_build_dir, "index.html")
-        if os.path.isfile(index_path):
-            return FileResponse(index_path)
-            
-    # Default fallback for unmatched API calls is a standard 404 Not Found
-    from fastapi import HTTPException
-    raise HTTPException(status_code=404, detail="Not Found")
+
+    # Otherwise, fallback to serving React's index.html
+    index_path = "../frontend/build/index.html"
+    if os.path.isfile(index_path):
+        return FileResponse(index_path)
+        
+    # If the frontend is completely missing, just return a friendly API message so the server survives
+    return {"message": "ChatConnect API v2 is running on Azure, but the frontend build is missing."}
