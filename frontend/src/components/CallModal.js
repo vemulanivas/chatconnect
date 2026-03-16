@@ -41,9 +41,10 @@ function CallModal({
   };
 
   const toggleSpeaker = () => {
-    if (remoteVideoRef.current) remoteVideoRef.current.muted = !isSpeakerOff;
-    if (remoteAudioRef.current) remoteAudioRef.current.muted = !isSpeakerOff;
-    setIsSpeakerOff(prev => !prev);
+    const newState = !isSpeakerOff;
+    if (remoteVideoRef.current) remoteVideoRef.current.muted = newState;
+    if (remoteAudioRef.current) remoteAudioRef.current.muted = newState;
+    setIsSpeakerOff(newState);
   }
 
   return (
@@ -58,20 +59,37 @@ function CallModal({
 
           {/* Video elements for video and screen calls */}
           {(callType === 'video' || callType === 'screen') && (
-            <div className="video-container">
-              <video
-                ref={remoteVideoRef}
-                className="remote-video"
-                autoPlay
-                playsInline
-              />
-              <video
-                ref={localVideoRef}
-                className="local-video"
-                autoPlay
-                playsInline
-                muted
-              />
+            <div className="call-video-area">
+              <div className="remote-video">
+                <video
+                  ref={remoteVideoRef}
+                  autoPlay
+                  playsInline
+                />
+                {(!remoteStream || (remoteStream && remoteStream.getVideoTracks().length === 0)) && (
+                  <div className="video-placeholder">
+                    <img 
+                      src={conversationAvatar} 
+                      alt={conversationName}
+                      onError={(e) => {
+                        e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(conversationName)}&background=random`;
+                      }}
+                    />
+                    <div className="connecting-badge">
+                      <span className="dot"></span>
+                      <p>Establishing secure connection...</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+              <div className="local-video">
+                <video
+                  ref={localVideoRef}
+                  autoPlay
+                  playsInline
+                  muted
+                />
+              </div>
             </div>
           )}
 

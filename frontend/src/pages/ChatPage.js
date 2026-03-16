@@ -114,6 +114,7 @@ function ChatPage() {
   const recordingIntervalRef = useRef(null);
   const typingTimeoutRef = useRef(null);
   const peerConnectionRef = useRef(null);
+  const iceCandidatesQueueRef = useRef([]);
 
   // Check authentication
   useEffect(() => {
@@ -194,10 +195,13 @@ function ChatPage() {
     };
 
     pc.ontrack = (event) => {
-      if (event.streams && event.streams[0]) {
-        console.log("Setting remote stream");
-        setRemoteStream(event.streams[0]);
-      }
+      setRemoteStream(prevStream => {
+        let stream = prevStream || new MediaStream();
+        if (event.track && !stream.getTracks().find(t => t.id === event.track.id)) {
+          stream.addTrack(event.track);
+        }
+        return new MediaStream(stream.getTracks());
+      });
     };
 
     peerConnectionRef.current = pc;
@@ -213,6 +217,7 @@ function ChatPage() {
       if (data.senderId === currentUser.id || data.callerId === currentUser.id) return;
 
       if (data.type === 'call-offer') {
+        iceCandidatesQueueRef.current = [];
         // If already in a call? Auto end previous or reject.
         if (peerConnectionRef.current) {
           console.log("Already in a call, ignoring offer");
@@ -226,6 +231,14 @@ function ChatPage() {
           try {
             await pc.setRemoteDescription(new RTCSessionDescription(data.answer));
             console.log("Remote description set for answer");
+            for (const candidate of iceCandidatesQueueRef.current) {
+              try {
+                await pc.addIceCandidate(new RTCIceCandidate(candidate));
+              } catch (e) {
+                console.error("Error adding queued ICE candidate:", e);
+              }
+            }
+            iceCandidatesQueueRef.current = [];
           } catch (e) {
             console.error("Error setting remote description:", e);
           }
@@ -240,12 +253,14 @@ function ChatPage() {
         }
       } else if (data.type === 'call-ice-candidate') {
         const pc = peerConnectionRef.current;
-        if (pc && pc.signalingState !== 'closed') {
+        if (pc && pc.remoteDescription) {
           try {
             await pc.addIceCandidate(new RTCIceCandidate(data.candidate));
           } catch (e) {
             console.error("Error adding ICE candidate:", e);
           }
+        } else {
+          iceCandidatesQueueRef.current.push(data.candidate);
         }
       } else if (data.type === 'call-end') {
         if (peerConnectionRef.current || incomingCallData) {
@@ -278,6 +293,15 @@ function ChatPage() {
       }
 
       await pc.setRemoteDescription(new RTCSessionDescription(data.offer));
+
+      for (const candidate of iceCandidatesQueueRef.current) {
+        try {
+          await pc.addIceCandidate(new RTCIceCandidate(candidate));
+        } catch (e) {
+          console.error("Error adding queued ICE candidate:", e);
+        }
+      }
+      iceCandidatesQueueRef.current = [];
 
       const constraints = { audio: true, video: data.callType === 'video' };
       const stream = await navigator.mediaDevices.getUserMedia(constraints);
@@ -737,6 +761,7 @@ function ChatPage() {
       }
       setLocalStream(stream);
 
+      iceCandidatesQueueRef.current = [];
       const pc = initWebRTC(activeConversation.participants.map(p => p.id || p).filter(id => id !== currentUser.id));
       stream.getTracks().forEach(track => pc.addTrack(track, stream));
 

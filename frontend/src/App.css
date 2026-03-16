@@ -3733,7 +3733,42 @@ body.dark-mode .recording-pulse {
 
 .video-placeholder p {
   font-size: 1.1rem;
-  opacity: 0.8;
+  opacity: 0.9;
+  letter-spacing: 0.5px;
+}
+
+.connecting-badge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  background: rgba(0, 0, 0, 0.4);
+  padding: 8px 20px;
+  border-radius: 30px;
+  backdrop-filter: blur(8px);
+  margin-top: 15px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.connecting-badge .dot {
+  width: 8px;
+  height: 8px;
+  background: #25d366;
+  border-radius: 50%;
+  animation: pulse-green 1.5s infinite;
+}
+
+@keyframes pulse-green {
+  0% { box-shadow: 0 0 0 0 rgba(37, 211, 102, 0.7); }
+  70% { box-shadow: 0 0 0 10px rgba(37, 211, 102, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(37, 211, 102, 0); }
+}
+
+.connecting-badge p {
+  margin: 0;
+  font-size: 0.9rem;
+  color: #e4e6eb;
+  font-weight: 500;
 }
 
 .participants-count {
