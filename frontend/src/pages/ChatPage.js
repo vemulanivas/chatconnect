@@ -1005,6 +1005,7 @@ function ChatPage() {
         }
       });
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeConversation?.id, conversationMessages?.length, currentUser]);
 
   // Get the other participant object from a DM conversation
