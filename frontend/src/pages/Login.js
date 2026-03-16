@@ -34,9 +34,9 @@ function Login() {
         navigate('/chat');
       } else {
         const msg = result.error || 'Invalid username or password';
-        console.log('[Login] Setting error message:', msg);
+        console.log('[Login] Failed:', msg);
         // 403 = banned account
-        if (msg.toLowerCase().includes('banned') || msg.toLowerCase().includes('access denied')) {
+        if (msg.toLowerCase().includes('banned') || msg.toLowerCase().includes('access denied') || msg.toLowerCase().includes('suspended')) {
           setBanError(true);
           setErrorMsg(msg);
         } else {
@@ -46,7 +46,12 @@ function Login() {
     } catch (err) {
       console.error('Login Error:', err);
       const msg = err.message || 'An error occurred during login';
-      setErrorMsg(msg === 'Invalid credentials' ? 'Invalid username or password' : msg);
+      if (msg.toLowerCase().includes('banned') || msg.toLowerCase().includes('access denied')) {
+        setBanError(true);
+        setErrorMsg(msg);
+      } else {
+        setErrorMsg(msg === 'Invalid credentials' ? 'Invalid username or password' : msg);
+      }
     } finally {
       setLocalLoading(false);
     }
