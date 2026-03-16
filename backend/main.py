@@ -221,4 +221,5 @@ async def serve_frontend(full_path: str):
     if os.path.isfile(index_path):
         return FileResponse(index_path)
         
-    return {"message": "ChatConnect API v2 is running on Azure, but the frontend build is missing."}
+    return {"message": "ChatConnect API v2 is running on Azure, but the frontend build is missing."}#   D e p l o y m e n t   S y n c  
+ 
