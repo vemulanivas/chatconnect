@@ -183,3 +183,12 @@ def health(debug: str = None):  # Accept and ignore debug param from Redux DevTo
 @app.get("/api/online-users")
 def online_users():
     return {"onlineUsers": manager.online_users()}
+
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
+
+app.mount("/static", StaticFiles(directory="../frontend/build/static"), name="static")
+
+@app.get("/")
+def serve_frontend():
+    return FileResponse("../frontend/build/index.html")
