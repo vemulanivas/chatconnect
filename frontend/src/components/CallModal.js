@@ -25,9 +25,11 @@ function CallModal({
   useEffect(() => {
     if (remoteVideoRef.current && remoteStream) {
       remoteVideoRef.current.srcObject = remoteStream;
+      remoteVideoRef.current.play().catch(e => console.warn("Remote video play failed:", e));
     }
     if (remoteAudioRef.current && remoteStream) {
       remoteAudioRef.current.srcObject = remoteStream;
+      remoteAudioRef.current.play().catch(e => console.warn("Remote audio play failed:", e));
     }
   }, [remoteStream]);
 

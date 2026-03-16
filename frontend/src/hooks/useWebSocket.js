@@ -158,13 +158,14 @@ export const useWebSocket = (token, currentUser) => {
   userRef.current = currentUser;
 
   const connect = useCallback(() => {
-    if (!tokenRef.current || !userRef.current) return;
+    const activeToken = tokenRef.current || localStorage.getItem('authToken');
+    if (!activeToken || !userRef.current) return;
 
     // Don't open a new socket if one is already open or connecting
     if (ws.current && (ws.current.readyState === WebSocket.OPEN || ws.current.readyState === WebSocket.CONNECTING)) return;
 
     try {
-      ws.current = new WebSocket(`${WS_URL}?token=${tokenRef.current}`);
+      ws.current = new WebSocket(`${WS_URL}?token=${activeToken}`);
 
       ws.current.onopen = () => {
         console.log('[WS] Connected');

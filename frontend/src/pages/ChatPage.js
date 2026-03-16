@@ -185,8 +185,16 @@ function ChatPage() {
   const initWebRTC = (targetIds) => {
     if (peerConnectionRef.current) return peerConnectionRef.current;
 
-    // Using standard Google STUN servers for NAT traversal
-    const pc = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
+    // Using multiple public STUN servers for better connectivity
+    const pc = new RTCPeerConnection({ 
+      iceServers: [
+        { urls: 'stun:stun.l.google.com:19302' },
+        { urls: 'stun:stun1.l.google.com:19302' },
+        { urls: 'stun:stun2.l.google.com:19302' },
+        { urls: 'stun:stun3.l.google.com:19302' },
+        { urls: 'stun:stun4.l.google.com:19302' },
+      ] 
+    });
 
     pc.onicecandidate = (event) => {
       if (event.candidate) {
@@ -217,7 +225,7 @@ function ChatPage() {
       if (data.senderId === currentUser.id || data.callerId === currentUser.id) return;
 
       if (data.type === 'call-offer') {
-        iceCandidatesQueueRef.current = [];
+        console.log("Received call-offer from", data.callerId);
         // If already in a call? Auto end previous or reject.
         if (peerConnectionRef.current) {
           console.log("Already in a call, ignoring offer");
@@ -226,6 +234,7 @@ function ChatPage() {
         }
         setIncomingCallData(data);
       } else if (data.type === 'call-answer') {
+        console.log("Received call-answer from", data.callerId);
         const pc = peerConnectionRef.current;
         if (pc && (pc.signalingState === 'have-local-offer')) {
           try {
@@ -252,6 +261,7 @@ function ChatPage() {
           }, 1000);
         }
       } else if (data.type === 'call-ice-candidate') {
+        console.log("Received call-ice-candidate from", data.callerId);
         const pc = peerConnectionRef.current;
         if (pc && pc.remoteDescription) {
           try {
@@ -263,6 +273,7 @@ function ChatPage() {
           iceCandidatesQueueRef.current.push(data.candidate);
         }
       } else if (data.type === 'call-end') {
+        console.log("Received call-end from", data.callerId);
         if (peerConnectionRef.current || incomingCallData) {
           setIncomingCallData(null);
           handleEndCall();
@@ -848,6 +859,9 @@ function ChatPage() {
         callTimerRef.current = null;
       }
 
+      // Clear ICE candidates queue for next call
+      iceCandidatesQueueRef.current = [];
+
       // Notify other peer about the call ending via webrtc signals
       sendEvent({ type: 'call-end', targetUserIds: mappedIds.filter(id => id !== currentUser.id) });
 
@@ -892,6 +906,7 @@ function ChatPage() {
       toggleGroupCall();
       toggleCall();
 
+      iceCandidatesQueueRef.current = [];
       setCallDuration(0);
       callTimerRef.current = setInterval(() => {
         setCallDuration(prev => prev + 1);
