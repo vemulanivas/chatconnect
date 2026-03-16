@@ -95,11 +95,14 @@ const chatReducer = (state = initialState, action) => {
       if (existingIndex >= 0) {
         const updated = [...state.conversations];
         updated[existingIndex] = action.payload;
+        // Move to top
+        const item = updated.splice(existingIndex, 1)[0];
+        updated.unshift(item);
         return { ...state, conversations: updated, activeConversation: action.payload };
       }
       return {
         ...state,
-        conversations: [...state.conversations, action.payload],
+        conversations: [action.payload, ...state.conversations],
         activeConversation: action.payload
       };
     }
@@ -109,26 +112,32 @@ const chatReducer = (state = initialState, action) => {
       if (existingIndex >= 0) {
         const updated = [...state.conversations];
         updated[existingIndex] = action.payload;
+        // Move to top
+        const item = updated.splice(existingIndex, 1)[0];
+        updated.unshift(item);
         return { ...state, conversations: updated, activeConversation: action.payload };
       }
       return {
         ...state,
-        conversations: [...state.conversations, action.payload],
+        conversations: [action.payload, ...state.conversations],
         activeConversation: action.payload
       };
     }
 
-    case types.UPDATE_CONVERSATION:
+    case types.UPDATE_CONVERSATION: {
+      const convs = state.conversations.filter(c => c.id !== action.payload.id);
+      const existing = state.conversations.find(c => c.id === action.payload.id);
+      const updated = existing ? { ...existing, ...action.payload } : action.payload;
+
       return {
         ...state,
-        conversations: state.conversations.map(c =>
-          c.id === action.payload.id ? { ...c, ...action.payload } : c
-        ),
+        conversations: [updated, ...convs],
         // Also update activeConversation if it matches
         activeConversation: state.activeConversation?.id === action.payload.id
           ? { ...state.activeConversation, ...action.payload }
           : state.activeConversation
       };
+    }
 
     case types.DELETE_CONVERSATION:
       return {

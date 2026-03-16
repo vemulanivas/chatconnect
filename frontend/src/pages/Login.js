@@ -33,13 +33,13 @@ function Login() {
         showSuccess('Login successful! Welcome back!', 'Welcome');
         navigate('/chat');
       } else {
-        const msg = result.error || 'Invalid credentials';
+        const msg = result.error || 'Invalid username or password';
         // 403 = banned account
         if (msg.toLowerCase().includes('banned') || msg.toLowerCase().includes('access denied')) {
           setBanError(true);
           setErrorMsg(msg);
         } else {
-          setErrorMsg(msg);
+          setErrorMsg(msg === 'Invalid credentials' ? 'Invalid username or password' : msg);
         }
       }
     } catch (err) {
