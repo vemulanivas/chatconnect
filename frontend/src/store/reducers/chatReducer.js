@@ -125,16 +125,21 @@ const chatReducer = (state = initialState, action) => {
     }
 
     case types.UPDATE_CONVERSATION: {
-      const convs = state.conversations.filter(c => c.id !== action.payload.id);
-      const existing = state.conversations.find(c => c.id === action.payload.id);
+      const convId = action.payload.id;
+      const existing = state.conversations.find(c => c.id === convId);
       const updated = existing ? { ...existing, ...action.payload } : action.payload;
+      
+      const newConversations = [updated, ...state.conversations.filter(c => c.id !== convId)];
+      const newChannels = updated.type === 'group' || updated.type === 'channel'
+        ? [updated, ...state.channels.filter(c => c.id !== convId)]
+        : state.channels;
 
       return {
         ...state,
-        conversations: [updated, ...convs],
-        // Also update activeConversation if it matches
-        activeConversation: state.activeConversation?.id === action.payload.id
-          ? { ...state.activeConversation, ...action.payload }
+        conversations: newConversations,
+        channels: newChannels,
+        activeConversation: state.activeConversation?.id === convId
+          ? { ...state.activeConversation, ...updated }
           : state.activeConversation
       };
     }
@@ -177,6 +182,40 @@ const chatReducer = (state = initialState, action) => {
         ...state,
         conversations: state.conversations.filter(c => c.id !== action.payload)
       };
+
+    // Real-time message updates to move conversation to top
+    case 'WS_RECEIVE_MESSAGE': {
+      const msg = action.payload;
+      const convId = msg.conversationId;
+      const existing = state.conversations.find(c => c.id === convId);
+
+      if (!existing) return state;
+
+      const updated = {
+        ...existing,
+        lastMessage: {
+          content: msg.content,
+          type: msg.type,
+          senderId: msg.senderId,
+          timestamp: msg.timestamp,
+        },
+        updatedAt: msg.timestamp
+      };
+
+      const newConversations = [updated, ...state.conversations.filter(c => c.id !== convId)];
+      const newChannels = updated.type === 'group' || updated.type === 'channel'
+        ? [updated, ...state.channels.filter(c => c.id !== convId)]
+        : state.channels;
+
+      return {
+        ...state,
+        conversations: newConversations,
+        channels: newChannels,
+        activeConversation: state.activeConversation?.id === convId
+          ? { ...state.activeConversation, ...updated }
+          : state.activeConversation
+      };
+    }
 
     // Real-time presence updates from WebSocket
     case 'WS_PRESENCE': {

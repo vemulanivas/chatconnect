@@ -34,9 +34,14 @@ function ChatSidebar({
   function getSortTime(userId) {
     const conv = getConversationForUser(userId);
     if (!conv || deletedConvIds.includes(conv.id)) return 0;
-    const ts = conv.lastMessage?.timestamp;
+    const ts = conv.lastMessage?.timestamp || conv.updatedAt || conv.created_at;
     if (!ts) return 0;
-    return new Date(ts.endsWith('Z') || ts.includes('+') ? ts : ts + 'Z').getTime();
+    try {
+      const fixed = (typeof ts === 'string' && !ts.endsWith('Z') && !ts.includes('+')) ? ts + 'Z' : ts;
+      return new Date(fixed).getTime() || 0;
+    } catch (e) {
+      return 0;
+    }
   }
 
   function getLastMessage(userId) {
@@ -108,12 +113,13 @@ function ChatSidebar({
   const filteredChannels = channels
     .filter(c => c.name?.toLowerCase().includes(searchQuery.toLowerCase()))
     .sort((a, b) => {
-      // sort groups by last message time too
-      const tsA = a.lastMessage?.timestamp;
-      const tsB = b.lastMessage?.timestamp;
-      const tA = tsA ? new Date(tsA.endsWith('Z') || tsA.includes('+') ? tsA : tsA + 'Z').getTime() : 0;
-      const tB = tsB ? new Date(tsB.endsWith('Z') || tsB.includes('+') ? tsB : tsB + 'Z').getTime() : 0;
-      return tB - tA;
+      const getTs = (conv) => {
+        const ts = conv.lastMessage?.timestamp || conv.updatedAt || conv.created_at;
+        if (!ts) return 0;
+        const fixed = (typeof ts === 'string' && !ts.endsWith('Z') && !ts.includes('+')) ? ts + 'Z' : ts;
+        return new Date(fixed).getTime() || 0;
+      };
+      return getTs(b) - getTs(a);
     });
 
   // ── Context menu handlers ────────────────────────────────────────────────
