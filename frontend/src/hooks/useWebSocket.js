@@ -35,8 +35,8 @@ const showRichNotification = async (title, body, data = {}) => {
       title,
       body,
       icon: '/favicon.ico',
-      conversationId: data.conversationId,
-      senderId: data.senderId,
+      conversationId: String(data.conversationId), // Ensure conversationId is a string
+      senderId: String(data.senderId), // Ensure senderId is a string
       senderName: data.senderName,
     });
   } else if ('Notification' in window && Notification.permission === 'granted') {
@@ -64,9 +64,11 @@ export const useWebSocket = (token, currentUser, activeConversation) => {
         if (data.message) {
           d(actions.receiveMessage(data.message));
           
-          const isFromMe = data.message.senderId === userRef.current?.id;
-          const isFromActiveChat = activeConvRef.current?.id === data.message.conversationId;
+          const isFromMe = String(data.message.senderId) === String(userRef.current?.id);
+          const isFromActiveChat = activeConvRef.current && String(activeConvRef.current.id) === String(data.message.conversationId);
           const isFocused = document.hasFocus();
+
+          console.log(`[WS] Message from ${data.message.senderName}. Active: ${activeConvRef.current?.id}. Match: ${isFromActiveChat}`);
 
           // 🛑 NEVER show notifications for our own messages
           if (isFromMe) break;
@@ -78,8 +80,8 @@ export const useWebSocket = (token, currentUser, activeConversation) => {
               data.message.senderName || 'New Message',
               data.message.content || 'New message',
               {
-                conversationId: data.message.conversationId,
-                senderId: data.message.senderId,
+                conversationId: String(data.message.conversationId), // Ensure conversationId is a string
+                senderId: String(data.message.senderId), // Ensure senderId is a string
                 senderName: data.message.senderName,
               }
             );
@@ -94,7 +96,7 @@ export const useWebSocket = (token, currentUser, activeConversation) => {
               type: 'message',
               title: data.message.senderName || 'New Message',
               content: data.message.content?.substring(0, 80) || 'Sent a message',
-              conversationId: data.message.conversationId,
+              conversationId: String(data.message.conversationId), // Ensure conversationId is a string
               timestamp: new Date().toISOString(),
               read: false,
             }));
@@ -113,19 +115,19 @@ export const useWebSocket = (token, currentUser, activeConversation) => {
         break;
 
       case 'typing':
-        d(actions.setRemoteTyping(data.userId, data.conversationId, data.isTyping));
+        d(actions.setRemoteTyping(data.userId, String(data.conversationId), data.isTyping)); // Ensure conversationId is a string
         // Auto-clear typing after 4 seconds if no stop event arrives
         if (data.isTyping) {
-          const key = `typing-timeout-${data.conversationId}-${data.userId}`;
+          const key = `typing-timeout-${String(data.conversationId)}-${data.userId}`; // Ensure conversationId is a string
           if (window[key]) clearTimeout(window[key]);
           window[key] = setTimeout(() => {
-            d(actions.setRemoteTyping(data.userId, data.conversationId, false));
+            d(actions.setRemoteTyping(data.userId, String(data.conversationId), false)); // Ensure conversationId is a string
           }, 4000);
         }
         break;
 
       case 'read':
-        d(actions.markReadReceipt(data.userId, data.conversationId, data.messageId));
+        d(actions.markReadReceipt(data.userId, String(data.conversationId), data.messageId)); // Ensure conversationId is a string
         break;
 
       case 'reaction':

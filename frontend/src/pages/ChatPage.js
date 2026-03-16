@@ -186,7 +186,7 @@ function ChatPage() {
     if (peerConnectionRef.current) return peerConnectionRef.current;
 
     // Using multiple public STUN servers for better connectivity
-    const pc = new RTCPeerConnection({ 
+    const pc = new RTCPeerConnection({
       iceServers: [
         { urls: 'stun:stun.l.google.com:19302' },
         { urls: 'stun:stun1.l.google.com:19302' },
@@ -200,7 +200,11 @@ function ChatPage() {
         { urls: 'stun:stun.voipbuster.com' },
         { urls: 'stun:stun.voipstunt.com' },
         { urls: 'stun:stun.voxgratia.org' },
-      ] 
+      ],
+      iceTransportPolicy: 'all',
+      bundlePolicy: 'max-bundle',
+      rtcpMuxPolicy: 'require',
+      iceCandidatePoolSize: 10
     });
 
     pc.onicecandidate = (event) => {
@@ -217,6 +221,17 @@ function ChatPage() {
         }
         return new MediaStream(stream.getTracks());
       });
+    };
+
+    pc.onconnectionstatechange = (event) => {
+      console.log(`[WebRTC] Connection State: ${pc.connectionState}`);
+      if (pc.connectionState === 'failed') {
+        console.error('[WebRTC] Connection failed. Check network/STUN.');
+      }
+    };
+
+    pc.oniceconnectionstatechange = (event) => {
+      console.log(`[WebRTC] ICE Connection State: ${pc.iceConnectionState}`);
     };
 
     peerConnectionRef.current = pc;
