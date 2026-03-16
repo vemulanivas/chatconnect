@@ -184,33 +184,39 @@ def health(debug: str = None):  # Accept and ignore debug param from Redux DevTo
 def online_users():
     return {"onlineUsers": manager.online_users()}
 
-import os
-from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+# Robust frontend path calculation
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+FRONTEND_BUILD_DIR = os.path.abspath(os.path.join(BASE_DIR, "..", "frontend", "build"))
+STATIC_DIR = os.path.join(FRONTEND_BUILD_DIR, "static")
 
-# Try to mount the static files exactly as they were before, but trap the error if the folder is missing during deployment
+# Try to mount the static files
 try:
-    if os.path.exists("../frontend/build/static"):
-        app.mount("/static", StaticFiles(directory="../frontend/build/static"), name="static")
+    if os.path.exists(STATIC_DIR):
+        app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 except RuntimeError:
     pass
 
 @app.get("/{full_path:path}")
 async def serve_frontend(full_path: str):
     # NEVER intercept API calls or Docs! Let FastAPI's default 404/Routers handle them
-    if full_path.startswith("api/") or full_path in ["docs", "redoc", "openapi.json"] or full_path.startswith("docs/"):
+    if not full_path or full_path.startswith("api/") or full_path in ["docs", "redoc", "openapi.json"] or full_path.startswith("docs/"):
+        # This handles the root path and API/Docs
+        if not full_path:
+            index_path = os.path.join(FRONTEND_BUILD_DIR, "index.html")
+            if os.path.isfile(index_path):
+                return FileResponse(index_path)
+            return {"message": "ChatConnect API v2 is running on Azure, but the frontend build is missing."}
         from fastapi import HTTPException
         raise HTTPException(status_code=404, detail="Not Found")
 
     # If they are asking for a specific file like favicon.ico
-    requested_file = os.path.join("../frontend/build", full_path)
+    requested_file = os.path.join(FRONTEND_BUILD_DIR, full_path)
     if os.path.isfile(requested_file):
         return FileResponse(requested_file)
 
-    # Otherwise, fallback to serving React's index.html
-    index_path = "../frontend/build/index.html"
+    # Otherwise, fallback to serving React's index.html for SPA routing
+    index_path = os.path.join(FRONTEND_BUILD_DIR, "index.html")
     if os.path.isfile(index_path):
         return FileResponse(index_path)
         
-    # If the frontend is completely missing, just return a friendly API message so the server survives
     return {"message": "ChatConnect API v2 is running on Azure, but the frontend build is missing."}
