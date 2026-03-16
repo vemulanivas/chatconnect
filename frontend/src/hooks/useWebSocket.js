@@ -2,7 +2,7 @@ import { useEffect, useRef, useCallback } from 'react';
 import { useDispatch } from 'react-redux';
 import * as actions from '../store/actions/actionCreators';
 
-const WS_URL = 'ws://localhost:8000/ws';
+const WS_URL = process.env.REACT_APP_WS_URL || 'wss://chatconnect-b5c9amhye7gpdfeb.southeastasia-01.azurewebsites.net/ws';
 
 // Register the notification service worker once
 let swRegistration = null;

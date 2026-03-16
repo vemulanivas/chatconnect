@@ -27,7 +27,7 @@ function SettingsModal({ currentUser, darkMode, onToggleDarkMode, onClose }) {
   async function activateAdmin() {
     setActivatingAdmin(true);
     try {
-      const res = await fetch('http://localhost:8000/api/admin/setup-first-admin', { method: 'POST' });
+      const res = await fetch('https://chatconnect-b5c9amhye7gpdfeb.southeastasia-01.azurewebsites.net/api/admin/setup-first-admin', { method: 'POST' });
       const data = await res.json();
       if (res.ok) {
         setAdminMsg('\u2705 Admin activated! Refreshing...');

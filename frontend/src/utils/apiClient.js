@@ -1,4 +1,4 @@
-const BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
+const BASE_URL = process.env.REACT_APP_API_URL || 'https://chatconnect-b5c9amhye7gpdfeb.southeastasia-01.azurewebsites.net';
 
 class ApiClient {
   getToken() { return localStorage.getItem('authToken'); }
