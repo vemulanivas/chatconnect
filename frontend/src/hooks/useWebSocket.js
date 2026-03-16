@@ -45,13 +45,16 @@ const showRichNotification = async (title, body, data = {}) => {
   }
 };
 
-export const useWebSocket = (token, currentUser) => {
+export const useWebSocket = (token, currentUser, activeConversation) => {
   const ws = useRef(null);
   const reconnectTimer = useRef(null);
   const reconnectCount = useRef(0);
   const dispatch = useDispatch();
   const dispatchRef = useRef(dispatch);
   dispatchRef.current = dispatch;
+
+  const activeConvRef = useRef(activeConversation);
+  activeConvRef.current = activeConversation;
 
   // Stable event handler — no deps that change
   const handleEvent = useCallback((data) => {
@@ -60,8 +63,17 @@ export const useWebSocket = (token, currentUser) => {
       case 'message':
         if (data.message) {
           d(actions.receiveMessage(data.message));
-          // Show notification when tab is not focused
-          if (!document.hasFocus() && Notification.permission === 'granted') {
+          
+          const isFromMe = data.message.senderId === userRef.current?.id;
+          const isFromActiveChat = activeConvRef.current?.id === data.message.conversationId;
+          const isFocused = document.hasFocus();
+
+          // 🛑 NEVER show notifications for our own messages
+          if (isFromMe) break;
+
+          // 1. OS-Level Browser Notification
+          // Only show if the user is NOT looking at the tab
+          if (!isFocused && Notification.permission === 'granted') {
             showRichNotification(
               data.message.senderName || 'New Message',
               data.message.content || 'New message',
@@ -72,8 +84,11 @@ export const useWebSocket = (token, currentUser) => {
               }
             );
           }
-          // Also show in-app toast that persists (even when focused, if from another user)
-          if (data.message.senderId !== userRef.current?.id) {
+          
+          // 2. In-App Custom Toast
+          // Only show if we are NOT in the active chat (so we know something happened elsewhere)
+          // AND either we are focused (so we see it now) or we want it preserved for later
+          if (!isFromActiveChat) {
             d(actions.addNotification({
               id: 'msg-' + Date.now(),
               type: 'message',

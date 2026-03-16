@@ -84,7 +84,7 @@ function ChatPage() {
   const token = useSelector(s => s.auth.token) || localStorage.getItem('authToken');
   const unreadCounts = useSelector(s => s.messages?.unreadCounts || {});
   const remoteTyping = useSelector(s => s.messages?.remoteTyping || {});
-  const { sendEvent, sendRead } = useWebSocket(token, currentUser);
+  const { sendEvent, sendRead } = useWebSocket(token, currentUser, activeConversation);
 
   // Local state
   const [messageInput, setMessageInput] = useState('');
@@ -193,6 +193,13 @@ function ChatPage() {
         { urls: 'stun:stun2.l.google.com:19302' },
         { urls: 'stun:stun3.l.google.com:19302' },
         { urls: 'stun:stun4.l.google.com:19302' },
+        { urls: 'stun:stun.ekiga.net' },
+        { urls: 'stun:stun.ideasip.com' },
+        { urls: 'stun:stun.schlund.de' },
+        { urls: 'stun:stun.voiparound.com' },
+        { urls: 'stun:stun.voipbuster.com' },
+        { urls: 'stun:stun.voipstunt.com' },
+        { urls: 'stun:stun.voxgratia.org' },
       ] 
     });
 
@@ -324,11 +331,14 @@ function ChatPage() {
 
       sendEvent({ type: 'call-answer', targetUserIds: targetIds, answer });
 
+      const callerUser = getUserById(data.callerId);
       startCall({
         callType: data.callType,
         conversationId: data.conversationId,
         participants: [data.callerId],
-        callerId: data.callerId
+        callerId: data.callerId,
+        callerName: data.callerName || callerUser?.fullName || 'Unknown User',
+        callerAvatar: data.callerAvatar || callerUser?.avatar || null
       });
       if (!modals.call) toggleCall();
 
@@ -792,7 +802,9 @@ function ChatPage() {
         callType: type,
         conversationId: activeConversation.id,
         participants: activeConversation.participants,
-        callerId: currentUser.id
+        callerId: currentUser.id,
+        targetName: getConversationName(),
+        targetAvatar: getConversationAvatar()
       });
 
       if (callTimerRef.current) clearInterval(callTimerRef.current);
@@ -1257,8 +1269,8 @@ function ChatPage() {
       {modals.call && (
         <CallModal
           callType={callType}
-          conversationName={getConversationName()}
-          conversationAvatar={getConversationAvatar()}
+          conversationName={activeCallData?.callerName || activeCallData?.targetName || getConversationName()}
+          conversationAvatar={activeCallData?.callerAvatar || activeCallData?.targetAvatar || getConversationAvatar()}
           onEndCall={handleEndCall}
           localStream={localStream}
           remoteStream={remoteStream}
