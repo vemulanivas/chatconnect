@@ -380,12 +380,15 @@ function ChatPage() {
 
 
   // Scroll to bottom on new messages or conversation change
-  useEffect(() => {
+  // useLayoutEffect ensures the jump happens before the browser repaints, avoiding flickers
+  React.useLayoutEffect(() => {
     if (activeConversation) {
       if (prevActiveConversationId.current !== activeConversation.id) {
-        // Jump immediately on conversation change
-        scrollToBottom('auto');
+        // Jump immediately on conversation change (like WhatsApp/Teams)
+        // Set a small delay or use setTimeout to ensure DOM is fully ready
+        const timer = setTimeout(() => scrollToBottom('auto'), 50);
         prevActiveConversationId.current = activeConversation.id;
+        return () => clearTimeout(timer);
       } else {
         // Smooth scroll for new messages in the same conversation
         scrollToBottom('smooth');
@@ -394,6 +397,15 @@ function ChatPage() {
   }, [messages, activeConversation]);
 
   const scrollToBottom = (behavior = 'smooth') => {
+    if (messagesContainerRef.current) {
+      const container = messagesContainerRef.current;
+      if (behavior === 'auto') {
+        container.scrollTop = container.scrollHeight;
+      } else {
+        container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' });
+      }
+    }
+    // Fallback if container ref is not ready
     if (messagesEndRef.current) {
       messagesEndRef.current.scrollIntoView({ behavior });
     }
@@ -862,7 +874,7 @@ function ChatPage() {
 
       const payload = {
         conversationId: resolvedConvId,
-        type: activeCallData?.callType || callType || 'audio',
+        type: activeCallData?.callType || callType || (incomingCallData?.callType) || 'audio',
         participants: mappedIds,
         duration: callDuration || 0,
         status: callDuration > 0 ? 'completed' : 'missed',

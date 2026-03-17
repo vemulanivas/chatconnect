@@ -304,15 +304,18 @@ function ChatMessages({
                       audioRefs={audioRefs}
                     />
                   ) : message.type === 'call' ? (
-                    <div className="call-message-content">
+                    <div className="call-message-bubble-content">
                       <div className="call-icon-circle">
                         <i className={`fas fa-${message.metadata?.callType === 'video' ? 'video' : 'phone-alt'}`}></i>
                       </div>
-                      <div className="call-info">
-                        <span className="call-title">{message.metadata?.callType === 'video' ? '📹 Video Call' : '📞 Audio Call'}</span>
-                        <span className="call-meta">
-                          {message.metadata?.duration ? formatDuration(message.metadata.duration) : '⚠ Missed'}
-                          <span className="call-dot"></span>
+                      <div className="call-msg-details">
+                        <span className="call-msg-title">
+                          {(message.metadata?.callType === 'video' || message.content?.toLowerCase().includes('video')) ? '📹 Video Call' : '📞 Audio Call'}
+                        </span>
+                        <span className="call-msg-meta">
+                          {message.metadata?.duration ? formatDuration(message.metadata.duration) : 
+                           (message.content?.includes(' - ') ? message.content.split(' - ')[1] : '⚠ Missed')}
+                          <span className="call-msg-dot"></span>
                           {formatTime(message.timestamp)}
                         </span>
                       </div>
