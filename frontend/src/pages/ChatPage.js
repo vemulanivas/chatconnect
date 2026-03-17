@@ -116,6 +116,7 @@ function ChatPage() {
   const peerConnectionRef = useRef(null);
   const iceCandidatesQueueRef = useRef([]);
   const prevActiveConversationId = useRef(activeConversation?.id);
+  const messagesCountRef = useRef(0);
 
   // Check authentication
   useEffect(() => {
@@ -383,20 +384,30 @@ function ChatPage() {
   // useLayoutEffect ensures the jump happens before the browser repaints, avoiding flickers
   React.useLayoutEffect(() => {
     if (activeConversation) {
+      const container = messagesContainerRef.current;
       const isNewConversation = prevActiveConversationId.current !== activeConversation.id;
+      const hasMessageCountChanged = messages.length !== messagesCountRef.current;
       
+      // Check if user is near the bottom (within 150px)
+      const isAtBottom = container ? 
+        (container.scrollHeight - container.scrollTop - container.clientHeight < 150) : 
+        true;
+
       if (isNewConversation) {
         // Instant jump for new conversations
         scrollToBottom('auto');
-        
-        // Only mark as "not new" once we have actually loaded messages for it
         if (messages && messages.length > 0) {
           prevActiveConversationId.current = activeConversation.id;
         }
-      } else {
-        // Smooth scroll for subsequent new messages in the same conversation
-        scrollToBottom('smooth');
+      } else if (hasMessageCountChanged) {
+        // Only auto-scroll if message count increased (new message) 
+        // AND user is already near the bottom
+        if (messages.length > messagesCountRef.current && isAtBottom) {
+          scrollToBottom('smooth');
+        }
       }
+      
+      messagesCountRef.current = messages.length;
     }
   }, [messages, activeConversation]);
 
@@ -471,7 +482,7 @@ function ChatPage() {
             targetUserIds: activeConversation.participants.map(p => p.id || p).filter(id => id !== currentUser.id)
           });
           setEditingMessageId(null);
-          showSuccess('Message updated');
+          showSuccess('Message updated', 'Message');
         }
       } else {
         const result = await sendMessage(
@@ -560,7 +571,7 @@ function ChatPage() {
     if (window.confirm('Delete this message?')) {
       try {
         await deleteMessage(messageId);
-        showSuccess('Message removed');
+        showSuccess('Message removed', 'Message');
       } catch (error) {
         console.error('Error deleting message:', error);
       }
@@ -587,7 +598,7 @@ function ChatPage() {
               targetUserIds: activeConversation.participants.map(p => p.id || p).filter(id => id !== currentUser.id)
             });
           }
-          showSuccess(`${isImage ? 'Image' : 'File'} shared`);
+          showSuccess(`${isImage ? 'Image' : 'File'} shared`, 'Media');
         } catch (error) {
           console.error('Error sending file:', error);
         }
@@ -604,7 +615,7 @@ function ChatPage() {
 
     try {
       await createChannel(channelName, channelDescription, channelPrivacy);
-      showSuccess('Group chat created');
+      showSuccess('Group chat created', 'Group');
       toggleCreateChannel();
       e.target.reset();
     } catch (error) {
@@ -621,7 +632,7 @@ function ChatPage() {
       try {
         await logout();
         navigate('/login');
-        showSuccess('You have been logged out');
+        showSuccess('You have been logged out', 'Logout');
       } catch (error) {
         console.error('Error logging out:', error);
       }
@@ -636,7 +647,7 @@ function ChatPage() {
     try {
       const result = await blockUser(userId);
       if (result?.success) {
-        showSuccess('User has been blocked');
+        showSuccess('User has been blocked', 'Privacy');
         toggleInfoPanel();
       } else {
         showError(result?.error || 'Failed to block user');
@@ -651,7 +662,7 @@ function ChatPage() {
     try {
       const result = await unblockUser(userId);
       if (result?.success) {
-        showSuccess('User has been unblocked');
+        showSuccess('User has been unblocked', 'Privacy');
       } else {
         showError(result?.error || 'Failed to unblock user');
       }
@@ -748,7 +759,7 @@ function ChatPage() {
           setAudioBlob(null);
           setAudioURL(null);
           setRecordingTime(0);
-          showSuccess('Voice message shared');
+          showSuccess('Voice message shared', 'Audio');
         } catch (error) {
           console.error('Error sending voice message:', error);
         }
@@ -773,7 +784,7 @@ function ChatPage() {
     try {
       const result = await deleteConversation(convId);
       if (result?.success) {
-        showSuccess('Conversation cleared');
+        showSuccess('Conversation cleared', 'Chat');
         // If we deleted the active chat, just stay happy (useUI usually handles clearing)
       } else {
         showError(result?.error || 'Failed to delete chat');
@@ -929,7 +940,7 @@ function ChatPage() {
       }
 
       const callStatus = callDuration > 0 ? `Call ended - ${formatDuration(callDuration)}` : 'Call missed';
-      showSuccess(callStatus);
+      showSuccess(callStatus, callDuration > 0 ? 'Call Ended' : 'Missed Call');
 
       setCallDuration(0);
       toggleCall();
