@@ -383,14 +383,18 @@ function ChatPage() {
   // useLayoutEffect ensures the jump happens before the browser repaints, avoiding flickers
   React.useLayoutEffect(() => {
     if (activeConversation) {
-      if (prevActiveConversationId.current !== activeConversation.id) {
-        // Jump immediately on conversation change (like WhatsApp/Teams)
-        // Set a small delay or use setTimeout to ensure DOM is fully ready
-        const timer = setTimeout(() => scrollToBottom('auto'), 50);
-        prevActiveConversationId.current = activeConversation.id;
-        return () => clearTimeout(timer);
+      const isNewConversation = prevActiveConversationId.current !== activeConversation.id;
+      
+      if (isNewConversation) {
+        // Instant jump for new conversations
+        scrollToBottom('auto');
+        
+        // Only mark as "not new" once we have actually loaded messages for it
+        if (messages && messages.length > 0) {
+          prevActiveConversationId.current = activeConversation.id;
+        }
       } else {
-        // Smooth scroll for new messages in the same conversation
+        // Smooth scroll for subsequent new messages in the same conversation
         scrollToBottom('smooth');
       }
     }

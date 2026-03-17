@@ -37,61 +37,68 @@ class ApiClient {
       try {
         const response = await fetch(`${BASE_URL}${path}`, options);
         if (response.status === 401) {
-          // Attempt to refresh token
-          const refreshToken = this.getRefreshToken();
-          if (refreshToken && path !== '/api/auth/refresh' && path !== '/api/auth/login' && path !== '/api/auth/register') {
-            if (!this.isRefreshing) {
-              this.isRefreshing = true;
-              try {
-                const refreshResponse = await fetch(`${BASE_URL}/api/auth/refresh`, {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ refresh_token: refreshToken })
-                });
+          const isAuthPath = path === '/api/auth/login' || path === '/api/auth/register' || path === '/api/auth/refresh';
+          
+          if (!isAuthPath) {
+            // Attempt to refresh token for general API calls
+            const refreshToken = this.getRefreshToken();
+            if (refreshToken) {
+              if (!this.isRefreshing) {
+                this.isRefreshing = true;
+                try {
+                  const refreshResponse = await fetch(`${BASE_URL}/api/auth/refresh`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ refresh_token: refreshToken })
+                  });
 
-                if (refreshResponse.ok) {
-                  const data = await refreshResponse.json();
-                  this.setToken(data.access_token, data.refresh_token);
-                  this.isRefreshing = false;
-                  this.onRefreshed(data.access_token);
-                } else {
+                  if (refreshResponse.ok) {
+                    const data = await refreshResponse.json();
+                    this.setToken(data.access_token, data.refresh_token);
+                    this.isRefreshing = false;
+                    this.onRefreshed(data.access_token);
+                  } else {
+                    this.isRefreshing = false;
+                    this.clearToken();
+                    window.location.href = '/login';
+                    throw new Error('Session expired.');
+                  }
+                } catch (refreshErr) {
                   this.isRefreshing = false;
                   this.clearToken();
                   window.location.href = '/login';
                   throw new Error('Session expired.');
                 }
-              } catch (refreshErr) {
-                this.isRefreshing = false;
-                this.clearToken();
-                window.location.href = '/login';
-                throw new Error('Session expired.');
               }
-            }
 
-            // Wait for the token wrapper
-            const newToken = await new Promise(resolve => {
-              this.subscribeTokenRefresh(token => {
-                resolve(token);
+              // Wait for the token wrapper
+              const newToken = await new Promise(resolve => {
+                this.subscribeTokenRefresh(token => {
+                  resolve(token);
+                });
               });
-            });
 
-            // Retry original request
-            options.headers['Authorization'] = `Bearer ${newToken}`;
-            const retryResponse = await fetch(`${BASE_URL}${path}`, options);
-            if (retryResponse.status === 401) {
-              this.clearToken(); window.location.href = '/login'; throw new Error('Session expired.');
-            }
-            if ((retryResponse.status >= 500 && retryResponse.status <= 599) || retryResponse.status === 429) {
-              if (i === retries - 1) throw new Error(`Server error: ${retryResponse.status}`);
-              continue;
-            }
-            const data = await retryResponse.json().catch(() => ({}));
-            if (!retryResponse.ok) throw new Error(data.detail || `Request failed: ${retryResponse.status}`);
-            return data;
+              // Retry original request
+              options.headers['Authorization'] = `Bearer ${newToken}`;
+              const retryResponse = await fetch(`${BASE_URL}${path}`, options);
+              if (retryResponse.status === 401) {
+                this.clearToken(); window.location.href = '/login'; throw new Error('Session expired.');
+              }
+              if ((retryResponse.status >= 500 && retryResponse.status <= 599) || retryResponse.status === 429) {
+                if (i === retries - 1) throw new Error(`Server error: ${retryResponse.status}`);
+                continue;
+              }
+              const data = await retryResponse.json().catch(() => ({}));
+              if (!retryResponse.ok) throw new Error(data.detail || `Request failed: ${retryResponse.status}`);
+              return data;
 
-          } else {
-            this.clearToken(); window.location.href = '/login'; throw new Error('Session expired.');
+            } else {
+              this.clearToken(); 
+              window.location.href = '/login'; 
+              throw new Error('Session expired.');
+            }
           }
+          // If it IS an auth path and we got 401, fall through to normal error handling at line 104
         }
 
         // If it's a server error or rate limiting, we might want to retry

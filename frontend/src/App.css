@@ -2262,16 +2262,10 @@ body.dark-mode .date-divider span {
   gap: 0.75rem;
   margin-bottom: 1rem;
   width: 100%;
-  animation: messageSlideIn 0.4s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .message.sent {
   flex-direction: row-reverse;
-  animation: messageSlideInRight 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.message.received {
-  animation: messageSlideInLeft 0.4s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 /* ── Premium Call Message Styling ── */
