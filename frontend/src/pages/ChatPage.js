@@ -115,6 +115,7 @@ function ChatPage() {
   const typingTimeoutRef = useRef(null);
   const peerConnectionRef = useRef(null);
   const iceCandidatesQueueRef = useRef([]);
+  const prevActiveConversationId = useRef(activeConversation?.id);
 
   // Check authentication
   useEffect(() => {
@@ -378,16 +379,23 @@ function ChatPage() {
   };
 
 
-  // Scroll to bottom on new messages
+  // Scroll to bottom on new messages or conversation change
   useEffect(() => {
-    scrollToBottom();
+    if (activeConversation) {
+      if (prevActiveConversationId.current !== activeConversation.id) {
+        // Jump immediately on conversation change
+        scrollToBottom('auto');
+        prevActiveConversationId.current = activeConversation.id;
+      } else {
+        // Smooth scroll for new messages in the same conversation
+        scrollToBottom('smooth');
+      }
+    }
   }, [messages, activeConversation]);
 
-
-
-  const scrollToBottom = () => {
+  const scrollToBottom = (behavior = 'smooth') => {
     if (messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+      messagesEndRef.current.scrollIntoView({ behavior });
     }
   };
 
@@ -447,7 +455,7 @@ function ChatPage() {
             targetUserIds: activeConversation.participants.map(p => p.id || p).filter(id => id !== currentUser.id)
           });
           setEditingMessageId(null);
-          showSuccess('Message edited successfully');
+          showSuccess('Message updated');
         }
       } else {
         const result = await sendMessage(
@@ -536,7 +544,7 @@ function ChatPage() {
     if (window.confirm('Delete this message?')) {
       try {
         await deleteMessage(messageId);
-        showSuccess('Message deleted');
+        showSuccess('Message removed');
       } catch (error) {
         console.error('Error deleting message:', error);
       }
@@ -563,7 +571,7 @@ function ChatPage() {
               targetUserIds: activeConversation.participants.map(p => p.id || p).filter(id => id !== currentUser.id)
             });
           }
-          showSuccess(`${isImage ? 'Image' : 'File'} sent successfully`);
+          showSuccess(`${isImage ? 'Image' : 'File'} shared`);
         } catch (error) {
           console.error('Error sending file:', error);
         }
@@ -580,7 +588,7 @@ function ChatPage() {
 
     try {
       await createChannel(channelName, channelDescription, channelPrivacy);
-      showSuccess('Group created successfully');
+      showSuccess('Group chat created');
       toggleCreateChannel();
       e.target.reset();
     } catch (error) {
@@ -597,7 +605,7 @@ function ChatPage() {
       try {
         await logout();
         navigate('/login');
-        showSuccess('Logged out successfully');
+        showSuccess('You have been logged out');
       } catch (error) {
         console.error('Error logging out:', error);
       }
@@ -612,7 +620,7 @@ function ChatPage() {
     try {
       const result = await blockUser(userId);
       if (result?.success) {
-        showSuccess('User blocked successfully');
+        showSuccess('User has been blocked');
         toggleInfoPanel();
       } else {
         showError(result?.error || 'Failed to block user');
@@ -627,7 +635,7 @@ function ChatPage() {
     try {
       const result = await unblockUser(userId);
       if (result?.success) {
-        showSuccess('User unblocked successfully');
+        showSuccess('User has been unblocked');
       } else {
         showError(result?.error || 'Failed to unblock user');
       }
@@ -724,7 +732,7 @@ function ChatPage() {
           setAudioBlob(null);
           setAudioURL(null);
           setRecordingTime(0);
-          showSuccess('Voice message sent');
+          showSuccess('Voice message shared');
         } catch (error) {
           console.error('Error sending voice message:', error);
         }
@@ -749,7 +757,7 @@ function ChatPage() {
     try {
       const result = await deleteConversation(convId);
       if (result?.success) {
-        showSuccess('Chat deleted successfully');
+        showSuccess('Conversation cleared');
         // If we deleted the active chat, just stay happy (useUI usually handles clearing)
       } else {
         showError(result?.error || 'Failed to delete chat');
@@ -854,7 +862,7 @@ function ChatPage() {
 
       const payload = {
         conversationId: resolvedConvId,
-        type: callType || 'audio',
+        type: activeCallData?.callType || callType || 'audio',
         participants: mappedIds,
         duration: callDuration || 0,
         status: callDuration > 0 ? 'completed' : 'missed',
@@ -904,9 +912,11 @@ function ChatPage() {
         });
       }
 
+      const callStatus = callDuration > 0 ? `Call ended - ${formatDuration(callDuration)}` : 'Call missed';
+      showSuccess(callStatus);
+
       setCallDuration(0);
       toggleCall();
-      showSuccess('Call ended');
     } catch (error) {
       console.error('Error ending call:', error);
     }
@@ -1185,7 +1195,7 @@ function ChatPage() {
                   try {
                     await apiClient.bookmarkMessage(msgId);
                     loadData();
-                    showSuccess('Message bookmarked!');
+                    showSuccess('Added to bookmarks');
                   } catch (e) {
                     console.error('Bookmark error:', e);
                   }

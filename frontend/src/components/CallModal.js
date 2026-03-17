@@ -59,42 +59,6 @@ function CallModal({
             </button>
           </div>
 
-          {/* Video elements for video and screen calls */}
-          {(callType === 'video' || callType === 'screen') && (
-            <div className="call-video-area">
-              <div className="remote-video">
-                <video
-                  ref={remoteVideoRef}
-                  autoPlay
-                  playsInline
-                />
-                {(!remoteStream || (remoteStream && remoteStream.getVideoTracks().length === 0)) && (
-                  <div className="video-placeholder">
-                    <img 
-                      src={conversationAvatar} 
-                      alt={conversationName}
-                      onError={(e) => {
-                        e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(conversationName)}&background=random`;
-                      }}
-                    />
-                    <div className="connecting-badge">
-                      <span className="dot"></span>
-                      <p>Establishing secure connection...</p>
-                    </div>
-                  </div>
-                )}
-              </div>
-              <div className="local-video">
-                <video
-                  ref={localVideoRef}
-                  autoPlay
-                  playsInline
-                  muted
-                />
-              </div>
-            </div>
-          )}
-
           {/* Audio call UI */}
           {callType === 'audio' && (
             <div className="audio-call-ui">
@@ -109,15 +73,58 @@ function CallModal({
                 />
                 <div className="call-pulse"></div>
               </div>
+              <div className="call-info-static">
+                <h3>{conversationName}</h3>
+                <p className="call-status">
+                  {callDuration > 0 ? formatDuration(callDuration) : 'Calling...'}
+                </p>
+              </div>
             </div>
           )}
 
-          <div className="call-info">
-            <h3>{conversationName}</h3>
-            <p className="call-status">
-              {callDuration > 0 ? formatDuration(callDuration) : 'Calling...'}
-            </p>
-          </div>
+          {/* Video elements for video and screen calls */}
+          {(callType === 'video' || callType === 'screen') && (
+            <>
+              <div className="call-video-area">
+                <div className="remote-video">
+                  <video
+                    ref={remoteVideoRef}
+                    autoPlay
+                    playsInline
+                  />
+                  {(!remoteStream || (remoteStream && remoteStream.getVideoTracks().length === 0)) && (
+                    <div className="video-placeholder">
+                      <img 
+                        src={conversationAvatar} 
+                        alt={conversationName}
+                        onError={(e) => {
+                          e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(conversationName)}&background=random`;
+                        }}
+                      />
+                      <div className="connecting-badge">
+                        <span className="dot"></span>
+                        <p>Establishing secure connection...</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+                <div className="local-video">
+                  <video
+                    ref={localVideoRef}
+                    autoPlay
+                    playsInline
+                    muted
+                  />
+                </div>
+              </div>
+              <div className="call-info">
+                <h3>{conversationName}</h3>
+                <p className="call-status">
+                  {callDuration > 0 ? formatDuration(callDuration) : 'Calling...'}
+                </p>
+              </div>
+            </>
+          )}
 
           <div className="call-controls">
             <button className={`call-control-btn ${isMuted ? 'muted' : ''}`} onClick={toggleMute} title={isMuted ? 'Unmute' : 'Mute'} style={isMuted ? { background: '#da3633', color: '#fff' } : {}}>
