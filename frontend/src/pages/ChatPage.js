@@ -383,30 +383,38 @@ function ChatPage() {
   // Scroll to bottom on new messages or conversation change
   // useLayoutEffect ensures the jump happens before the browser repaints, avoiding flickers
   React.useLayoutEffect(() => {
-    if (activeConversation) {
-      const container = messagesContainerRef.current;
-      const isNewConversation = prevActiveConversationId.current !== activeConversation.id;
-      const hasMessageCountChanged = messages.length !== messagesCountRef.current;
-      
+    if (!activeConversation) return;
+
+    const container = messagesContainerRef.current;
+    const isNewConversation = prevActiveConversationId.current !== activeConversation.id;
+    const hasMessages = messages && messages.length > 0;
+
+    if (isNewConversation) {
+      if (hasMessages) {
+        // We have messages for the first time in this new chat - FORCE jump to bottom
+        scrollToBottom('auto');
+        prevActiveConversationId.current = activeConversation.id;
+      } else {
+        // Still loading or empty - attempt to jump just in case, but stay in "new" state
+        // so that when messages eventually load, we perform the forced jump above.
+        scrollToBottom('auto');
+      }
+      messagesCountRef.current = messages.length;
+      return;
+    }
+
+    // Normal Smart Scroll logic for subsequent messages in the same chat
+    const hasMessageCountChanged = messages.length !== messagesCountRef.current;
+    if (hasMessageCountChanged) {
       // Check if user is near the bottom (within 150px)
       const isAtBottom = container ? 
         (container.scrollHeight - container.scrollTop - container.clientHeight < 150) : 
         true;
-
-      if (isNewConversation) {
-        // Instant jump for new conversations
-        scrollToBottom('auto');
-        if (messages && messages.length > 0) {
-          prevActiveConversationId.current = activeConversation.id;
-        }
-      } else if (hasMessageCountChanged) {
-        // Only auto-scroll if message count increased (new message) 
-        // AND user is already near the bottom
-        if (messages.length > messagesCountRef.current && isAtBottom) {
-          scrollToBottom('smooth');
-        }
-      }
       
+      // Auto-scroll only if a new message was added (count increased) AND user is at the bottom
+      if (messages.length > messagesCountRef.current && isAtBottom) {
+        scrollToBottom('smooth');
+      }
       messagesCountRef.current = messages.length;
     }
   }, [messages, activeConversation]);
@@ -479,7 +487,7 @@ function ChatPage() {
             type: 'message-edit',
             messageId: editingMessageId,
             newContent: messageInput,
-            targetUserIds: activeConversation.participants.map(p => p.id || p).filter(id => id !== currentUser.id)
+            targetUserIds: activeConversation.participants.map(p => String(p.id || p)).filter(id => id !== String(currentUser.id))
           });
           setEditingMessageId(null);
           showSuccess('Message updated', 'Message');
@@ -495,7 +503,7 @@ function ChatPage() {
           sendEvent({
             type: 'message',
             message: result.message,
-            targetUserIds: activeConversation.participants.map(p => p.id || p).filter(id => id !== currentUser.id)
+            targetUserIds: activeConversation.participants.map(p => String(p.id || p)).filter(id => id !== String(currentUser.id))
           });
         }
       }
@@ -521,8 +529,8 @@ function ChatPage() {
     if (activeConversation) {
       // Send typing indicator to OTHER users via WebSocket
       const targetUserIds = activeConversation.participants
-        ?.map(p => p.id || p)
-        .filter(id => id !== currentUser?.id) || [];
+        ?.map(p => String(p.id || p))
+        .filter(id => id !== String(currentUser?.id)) || [];
 
       if (targetUserIds.length > 0) {
         sendEvent({
@@ -595,7 +603,7 @@ function ChatPage() {
             sendEvent({
               type: 'message',
               message: result.message,
-              targetUserIds: activeConversation.participants.map(p => p.id || p).filter(id => id !== currentUser.id)
+              targetUserIds: activeConversation.participants.map(p => String(p.id || p)).filter(id => id !== String(currentUser.id))
             });
           }
           showSuccess(`${isImage ? 'Image' : 'File'} shared`, 'Media');
@@ -752,7 +760,7 @@ function ChatPage() {
             sendEvent({
               type: 'message',
               message: result.message,
-              targetUserIds: activeConversation.participants.map(p => p.id || p).filter(id => id !== currentUser.id)
+              targetUserIds: activeConversation.participants.map(p => String(p.id || p)).filter(id => id !== String(currentUser.id))
             });
           }
           toggleVoiceRecorder();
@@ -841,7 +849,7 @@ function ChatPage() {
 
       sendEvent({
         type: 'call-offer',
-        targetUserIds: activeConversation.participants.map(p => p.id || p).filter(id => id !== currentUser.id),
+        targetUserIds: activeConversation.participants.map(p => String(p.id || p)).filter(id => id !== String(currentUser.id)),
         offer: offer,
         callType: type,
         conversationId: activeConversation.id,
@@ -935,7 +943,7 @@ function ChatPage() {
         sendEvent({
           type: 'message',
           message: endResult.message,
-          targetUserIds: activeConversation.participants.map(p => p.id || p).filter(id => id !== currentUser.id)
+          targetUserIds: activeConversation.participants.map(p => String(p.id || p)).filter(id => id !== String(currentUser.id))
         });
       }
 
@@ -1031,8 +1039,8 @@ function ChatPage() {
 
     if (unreadFromOther.length > 0) {
       const targetUserIds = (activeConversation.participants || [])
-        .map(p => typeof p === 'object' ? (p.id || p.userId) : p)
-        .filter(id => id && id !== currentUser.id);
+        .map(p => String(typeof p === 'object' ? (p.id || p.userId) : p))
+        .filter(id => id && id !== String(currentUser.id));
 
       unreadFromOther.slice(-10).forEach(m => {
         markAsRead(m.id); // Update local state immediately

@@ -95,10 +95,12 @@ export const useMessages = () => {
   const isTyping = useCallback((conversationId) => {
     // Check remote typing status (from OTHER users via WebSocket)
     const remoteTyping = messages.remoteTyping || {};
+    const convIdStr = String(conversationId);
+    
     for (const key of Object.keys(remoteTyping)) {
-      if (key.startsWith(conversationId + '-') && remoteTyping[key]) {
+      if (key.startsWith(convIdStr + '-') && remoteTyping[key]) {
         // Extract userId from key "conversationId-userId"
-        const userId = key.substring(conversationId.length + 1);
+        const userId = key.substring(convIdStr.length + 1);
         return userId; // Return the userId of who is typing
       }
     }
