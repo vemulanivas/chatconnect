@@ -3718,7 +3718,7 @@ body.dark-mode .recording-pulse {
 }
 
 .call-modal-content {
-  max-width: 900px;
+  max-width: 1200px;
   width: 95%;
   max-height: 95vh;
   background: transparent;
@@ -3730,8 +3730,8 @@ body.dark-mode .recording-pulse {
 .call-container {
   display: flex;
   flex-direction: column;
-  height: 80vh;
-  min-height: 500px;
+  height: 90vh;
+  min-height: 600px;
   background: linear-gradient(180deg, #1a1a2e 0%, #16213e 50%, #0f0f23 100%);
   position: relative;
   border-radius: 20px;
@@ -3766,7 +3766,13 @@ body.dark-mode .recording-pulse {
 .remote-video video {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain; /* Changed from cover to contain to prevent cropping face/screen */
+  background: #000;
+}
+
+.remote-video.screen-mode video {
+  object-fit: contain;
+  background: #000;
 }
 
 .video-placeholder {
@@ -3838,9 +3844,9 @@ body.dark-mode .recording-pulse {
   position: absolute;
   bottom: 100px;
   right: 20px;
-  width: 180px;
-  height: 240px;
-  border-radius: 16px;
+  width: 140px;
+  height: 190px;
+  border-radius: 12px;
   border: 3px solid rgba(255, 255, 255, 0.3);
   overflow: hidden;
   box-shadow: var(--shadow-lg);

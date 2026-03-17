@@ -29,7 +29,12 @@ function CallModal({
     }
     if (remoteAudioRef.current && remoteStream) {
       remoteAudioRef.current.srcObject = remoteStream;
-      remoteAudioRef.current.play().catch(e => console.warn("Remote audio play failed:", e));
+      // Ensure audio is unmuted and play requested
+      remoteAudioRef.current.muted = false;
+      const playPromise = remoteAudioRef.current.play();
+      if (playPromise !== undefined) {
+        playPromise.catch(e => console.warn("Remote audio play delayed or blocked:", e));
+      }
     }
   }, [remoteStream]);
 
@@ -86,7 +91,7 @@ function CallModal({
           {(callType === 'video' || callType === 'screen') && (
             <>
               <div className="call-video-area">
-                <div className="remote-video">
+                <div className={`remote-video ${callType}-mode`}>
                   <video
                     ref={remoteVideoRef}
                     autoPlay

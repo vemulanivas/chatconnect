@@ -255,6 +255,7 @@ function ChatMessages({
               </div>
             )}
             <div
+              id={`msg-${message.id}`}
               className={`message ${isOwnMessage ? 'sent' : 'received'} ${message.type === 'call' ? 'call-message' : ''}`}
               style={{ animationDelay: `${index * 0.05}s` }}
             >
@@ -274,12 +275,44 @@ function ChatMessages({
                 )}
 
                 <div className="message-bubble">
-                  {message.replyToMessageId && (
-                    <div className="replied-message-preview" style={{ background: 'rgba(0,0,0,0.1)', padding: '6px 12px', borderRadius: '8px', marginBottom: '8px', borderLeft: '3px solid var(--primary-color)', fontSize: '0.85em', opacity: 0.8 }}>
-                      <i className="fas fa-reply" style={{ marginRight: 6 }}></i>
-                      <span>Replying to a message...</span>
-                    </div>
-                  )}
+                  {(() => {
+                    const parentId = message.replyToMessageId || message.reply_to_id;
+                    if (!parentId) return null;
+                    const parentMsg = messages.find(m => String(m.id) === String(parentId));
+                    return (
+                      <div className="replied-message-preview" 
+                        onClick={() => {
+                          const el = document.getElementById(`msg-${parentId}`);
+                          if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        }}
+                        style={{ 
+                          background: isOwnMessage ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.06)', 
+                          padding: '6px 12px', 
+                          borderRadius: '8px', 
+                          marginBottom: '8px', 
+                          borderLeft: '4px solid var(--primary-color)', 
+                          fontSize: '0.85em', 
+                          opacity: 0.9,
+                          cursor: parentMsg ? 'pointer' : 'default',
+                          userSelect: 'none'
+                        }}
+                      >
+                        <div style={{ fontWeight: '700', marginBottom: '2px', display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--primary-color)' }}>
+                          <i className="fas fa-reply" style={{ fontSize: '0.9em' }}></i>
+                          <span>{parentMsg ? (parentMsg.senderId === currentUser?.id ? 'You' : (parentMsg.senderName || users.find(u => u.id === parentMsg.senderId)?.fullName || 'User')) : 'Original Message'}</span>
+                        </div>
+                        <div style={{ 
+                          whiteSpace: 'nowrap', 
+                          overflow: 'hidden', 
+                          textOverflow: 'ellipsis',
+                          color: isOwnMessage ? 'rgba(255,255,255,0.8)' : 'var(--text-secondary)',
+                          maxHeight: '1.4em'
+                        }}>
+                          {parentMsg ? (parentMsg.type === 'text' ? parentMsg.content : `[${parentMsg.type.charAt(0).toUpperCase() + parentMsg.type.slice(1)}]`) : 'Message deleted or unavailable'}
+                        </div>
+                      </div>
+                    );
+                  })()}
 
                   {message.type === 'image' ? (
                     <img src={message.content} alt="Shared" className="message-image" />

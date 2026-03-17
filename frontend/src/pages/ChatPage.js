@@ -216,13 +216,20 @@ function ChatPage() {
     };
 
     pc.ontrack = (event) => {
-      setRemoteStream(prevStream => {
-        let stream = prevStream || new MediaStream();
-        if (event.track && !stream.getTracks().find(t => t.id === event.track.id)) {
-          stream.addTrack(event.track);
-        }
-        return new MediaStream(stream.getTracks());
-      });
+      console.log(`[WebRTC] Received remote track: ${event.track.kind}`);
+      if (event.streams && event.streams[0]) {
+        // More robust: use the stream directly from the event
+        setRemoteStream(event.streams[0]);
+      } else {
+        // Fallback: manually assemble tracks into a stream if streams[0] is missing
+        setRemoteStream(prevStream => {
+          const stream = prevStream || new MediaStream();
+          if (event.track && !stream.getTracks().find(t => t.id === event.track.id)) {
+            stream.addTrack(event.track);
+          }
+          return new MediaStream(stream.getTracks());
+        });
+      }
     };
 
     pc.onconnectionstatechange = (event) => {
@@ -249,22 +256,27 @@ function ChatPage() {
       if (data.senderId === currentUser.id || data.callerId === currentUser.id) return;
 
       if (data.type === 'call-offer') {
-        console.log("Received call-offer from", data.callerId);
+        const callerIdStr = String(data.callerId || data.senderId);
+        console.log("Received call-offer from", callerIdStr);
         // If already in a call? Auto end previous or reject.
         if (peerConnectionRef.current) {
           console.log("Already in a call, ignoring offer");
-          sendEvent({ type: 'call-end', targetUserIds: [data.callerId] });
+          sendEvent({ type: 'call-end', targetUserIds: [callerIdStr] });
           return;
         }
-        setIncomingCallData(data);
+        setIncomingCallData({ ...data, callerId: callerIdStr });
       } else if (data.type === 'call-answer') {
-        console.log("Received call-answer from", data.callerId);
+        const senderIdStr = String(data.senderId || data.callerId);
+        console.log("Received call-answer from", senderIdStr);
         const pc = peerConnectionRef.current;
         if (pc && (pc.signalingState === 'have-local-offer')) {
           try {
             await pc.setRemoteDescription(new RTCSessionDescription(data.answer));
             console.log("Remote description set for answer");
-            for (const candidate of iceCandidatesQueueRef.current) {
+            
+            // Re-process any candidates that arrived before the answer
+            const validCandidates = iceCandidatesQueueRef.current.filter(c => c !== null);
+            for (const candidate of validCandidates) {
               try {
                 await pc.addIceCandidate(new RTCIceCandidate(candidate));
               } catch (e) {
@@ -297,7 +309,8 @@ function ChatPage() {
           iceCandidatesQueueRef.current.push(data.candidate);
         }
       } else if (data.type === 'call-end') {
-        console.log("Received call-end from", data.callerId);
+        const senderIdStr = String(data.senderId || data.callerId);
+        console.log("Received call-end from", senderIdStr);
         if (peerConnectionRef.current || incomingCallData) {
           setIncomingCallData(null);
           handleEndCall();
