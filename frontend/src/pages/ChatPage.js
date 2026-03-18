@@ -398,26 +398,29 @@ function ChatPage() {
   React.useLayoutEffect(() => {
     if (!activeConversation) return;
 
-    const container = messagesContainerRef.current;
     const isNewConversation = prevActiveConversationId.current !== activeConversation.id;
-    const hasMessages = messages && messages.length > 0;
+    const convMessages = getMessagesByConversation(activeConversation.id);
+    const hasMessages = convMessages && convMessages.length > 0;
 
     if (isNewConversation) {
+      // Force jump to bottom immediately + delayed retry after DOM paint
+      scrollToBottom('auto');
+      // Delayed retries ensure scroll fires AFTER messages are rendered in the DOM
+      requestAnimationFrame(() => scrollToBottom('auto'));
+      setTimeout(() => scrollToBottom('auto'), 50);
+      setTimeout(() => scrollToBottom('auto'), 150);
+
       if (hasMessages) {
-        // We have messages for the first time in this new chat - FORCE jump to bottom
-        scrollToBottom('auto');
         prevActiveConversationId.current = activeConversation.id;
-      } else {
-        // Still loading or empty - attempt to jump just in case, but stay in "new" state
-        // so that when messages eventually load, we perform the forced jump above.
-        scrollToBottom('auto');
       }
-      messagesCountRef.current = messages.length;
+      // else: stay in "new" state so when messages load we re-enter this branch
+      messagesCountRef.current = convMessages.length;
       return;
     }
 
     // Normal Smart Scroll logic for subsequent messages in the same chat
-    const hasMessageCountChanged = messages.length !== messagesCountRef.current;
+    const container = messagesContainerRef.current;
+    const hasMessageCountChanged = convMessages.length !== messagesCountRef.current;
     if (hasMessageCountChanged) {
       // Check if user is near the bottom (within 150px)
       const isAtBottom = container ? 
@@ -425,23 +428,29 @@ function ChatPage() {
         true;
       
       // Auto-scroll only if a new message was added (count increased) AND user is at the bottom
-      if (messages.length > messagesCountRef.current && isAtBottom) {
+      if (convMessages.length > messagesCountRef.current && isAtBottom) {
         scrollToBottom('smooth');
       }
-      messagesCountRef.current = messages.length;
+      messagesCountRef.current = convMessages.length;
     }
-  }, [messages, activeConversation]);
+  }, [messages, activeConversation, getMessagesByConversation]);
 
   const scrollToBottom = (behavior = 'smooth') => {
-    if (messagesContainerRef.current) {
-      const container = messagesContainerRef.current;
+    const container = messagesContainerRef.current;
+    if (container) {
       if (behavior === 'auto') {
+        // Temporarily disable CSS smooth scrolling for instant jump
+        container.style.scrollBehavior = 'auto';
         container.scrollTop = container.scrollHeight;
+        // Restore after the paint
+        requestAnimationFrame(() => {
+          container.style.scrollBehavior = '';
+        });
       } else {
         container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' });
       }
     }
-    // Fallback if container ref is not ready
+    // Fallback via sentinel ref
     if (messagesEndRef.current) {
       messagesEndRef.current.scrollIntoView({ behavior });
     }
