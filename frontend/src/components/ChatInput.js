@@ -153,20 +153,26 @@ function ChatInput({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [showEmojiPicker, setShowEmojiPicker, showGiphyPicker]);
 
-  // Handle Giphy Search
+  // Handle Tenor GIF Search
   useEffect(() => {
-    if (!showGiphyPicker || !giphySearch) {
-      if (showGiphyPicker && !giphySearch) {
-          fetch(`https://api.giphy.com/v1/gifs/trending?api_key=${giphyApiKey}&limit=12`)
-            .then(res => res.json())
-            .then(json => setGiphyResults(json.data || []));
-      }
+    if (!showGiphyPicker) return;
+    
+    // Tenor Public API key
+    const tenorKey = 'LIVDSRZULELA'; 
+
+    if (!giphySearch) {
+      fetch(`https://g.tenor.com/v1/trending?key=${tenorKey}&limit=12`)
+        .then(res => res.json())
+        .then(json => setGiphyResults(json.results || []))
+        .catch(() => setGiphyResults([]));
       return;
     }
+    
     const timer = setTimeout(() => {
-      fetch(`https://api.giphy.com/v1/gifs/search?api_key=${giphyApiKey}&q=${encodeURIComponent(giphySearch)}&limit=12`)
+      fetch(`https://g.tenor.com/v1/search?key=${tenorKey}&q=${encodeURIComponent(giphySearch)}&limit=12`)
         .then(res => res.json())
-        .then(json => setGiphyResults(json.data || []));
+        .then(json => setGiphyResults(json.results || []))
+        .catch(() => setGiphyResults([]));
     }, 400);
     return () => clearTimeout(timer);
   }, [giphySearch, showGiphyPicker]);
@@ -409,23 +415,27 @@ function ChatInput({
       {/* Priority indicator when not normal */}
       {priority && priority !== 'normal' && (
         <div style={{
+          position: 'absolute',
+          top: '-35px',
+          left: '20px',
           padding: '4px 10px',
           fontSize: '12px',
           fontWeight: 600,
           color: currentPriority.color,
           background: priority === 'urgent' ? 'rgba(239,68,68,0.1)' : 'rgba(245,158,11,0.1)',
           borderRadius: '6px',
-          display: 'flex',
+          display: 'inline-flex',
           alignItems: 'center',
-          gap: '4px',
-          width: '100%',
-          marginBottom: '4px'
+          gap: '6px',
+          border: `1px solid ${currentPriority.color}33`,
+          backdropFilter: 'blur(10px)',
+          zIndex: 10
         }}>
           <span>{currentPriority.icon}</span>
           <span>{currentPriority.label} Message</span>
           <button onClick={() => onPriorityChange && onPriorityChange('normal')} style={{
             background: 'none', border: 'none', cursor: 'pointer', color: currentPriority.color,
-            marginLeft: 'auto', padding: '0 4px', fontSize: '14px'
+            marginLeft: '8px', padding: '0', fontSize: '14px', display: 'flex'
           }}>
             <i className="fas fa-times"></i>
           </button>
@@ -542,7 +552,7 @@ function ChatInput({
                 <div 
                   key={gif.id} 
                   onClick={() => { 
-                    onSendMessage(gif.images.fixed_height.url, 'image');
+                    onSendMessage(gif.media[0].gif.url, 'image');
                     setShowGiphyPicker(false);
                     setGiphySearch('');
                   }}
@@ -555,8 +565,8 @@ function ChatInput({
                   onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
                 >
                   <img 
-                    src={gif.images.fixed_height_small.url} 
-                    alt={gif.title} 
+                    src={gif.media[0].tinygif.url} 
+                    alt="Sticker" 
                     style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                   />
                 </div>
