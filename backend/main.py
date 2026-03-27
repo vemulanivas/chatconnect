@@ -16,6 +16,41 @@ Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="ChatConnect API", version="2.0.0")
 
+@app.on_event("startup")
+def patch_database_schema():
+    from sqlalchemy import text
+    try:
+        with engine.connect() as conn:
+            # 1. Update MESSAGES table
+            statements = [
+                "ALTER TABLE messages ADD COLUMN IF NOT EXISTS priority VARCHAR DEFAULT 'normal';",
+                "ALTER TABLE messages ADD COLUMN IF NOT EXISTS mentions JSONB DEFAULT '[]'::jsonb;",
+                "ALTER TABLE messages ADD COLUMN IF NOT EXISTS reply_to_id VARCHAR;"
+            ]
+            for sql in statements:
+                try:
+                    conn.execute(text(sql))
+                    conn.commit()
+                except Exception:
+                    pass
+
+            # 2. Update USERS table
+            user_statements = [
+                "ALTER TABLE users ADD COLUMN IF NOT EXISTS is_admin BOOLEAN DEFAULT FALSE;",
+                "ALTER TABLE users ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE;",
+                "ALTER TABLE users ADD COLUMN IF NOT EXISTS last_seen TIMESTAMP WITH TIME ZONE;",
+                "ALTER TABLE users ADD COLUMN IF NOT EXISTS last_login TIMESTAMP WITH TIME ZONE;"
+            ]
+            for sql in user_statements:
+                try:
+                    conn.execute(text(sql))
+                    conn.commit()
+                except Exception:
+                    pass
+            print("[INFO] Database schema successfully verified and patched on startup!")
+    except Exception as e:
+        print(f"[ERROR] Could not patch database schema: {e}")
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
