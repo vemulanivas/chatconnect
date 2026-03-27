@@ -148,6 +148,7 @@ class ApiClient {
 
   // USERS
   async getUsers() { return this.request('GET', '/api/users/'); }
+  async searchUsers(query) { return this.request('GET', `/api/users/search?q=${encodeURIComponent(query)}`); }
   async updateProfile(data) { return this.request('PUT', '/api/users/me', data); }
   async blockUser(userId) { return this.request('POST', '/api/users/block', { user_id: userId }); }
   async unblockUser(userId) { return this.request('POST', '/api/users/unblock', { user_id: userId }); }
@@ -167,7 +168,12 @@ class ApiClient {
   // MESSAGES
   async getMessages(conversationId, limit = 50) { return this.request('GET', `/api/messages/${conversationId}?limit=${limit}`); }
   async sendMessage(conversationId, content, type = 'text', metadata = {}) {
-    return this.request('POST', '/api/messages/', { conversation_id: conversationId, content, type, ...metadata });
+    return this.request('POST', '/api/messages/', {
+      conversation_id: conversationId, content, type,
+      priority: metadata.priority || 'normal',
+      mentions: metadata.mentions || [],
+      ...metadata
+    });
   }
   async editMessage(messageId, content) { return this.request('PUT', `/api/messages/${messageId}`, { content }); }
   async deleteMessage(messageId) { return this.request('DELETE', `/api/messages/${messageId}`); }
@@ -177,6 +183,14 @@ class ApiClient {
   async searchMessages(conversationId, q) { return this.request('GET', `/api/messages/search/${conversationId}?q=${encodeURIComponent(q)}`); }
   async flagMessage(messageId) { return this.request('POST', `/api/messages/${messageId}/flag`); }
   async markMessageRead(messageId) { return this.request('POST', `/api/messages/${messageId}/read`); }
+  async getThread(messageId) { return this.request('GET', `/api/messages/${messageId}/thread`); }
+  async createPoll(conversationId, question, options, isAnonymous = false, allowMultiple = false) {
+    return this.request('POST', '/api/messages/poll', {
+      conversation_id: conversationId, question, options, is_anonymous: isAnonymous, allow_multiple: allowMultiple
+    });
+  }
+  async votePoll(pollId, optionIndex) { return this.request('POST', `/api/messages/poll/${pollId}/vote`, { option_index: optionIndex }); }
+  async getPoll(pollId) { return this.request('GET', `/api/messages/poll/${pollId}`); }
 
   // CALLS
   async getCallHistory() { return this.request('GET', '/api/calls/'); }

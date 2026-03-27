@@ -109,6 +109,8 @@ class Message(Base):
     is_pinned = Column(Boolean, default=False)
     is_bookmarked = Column(Boolean, default=False)
     is_flagged = Column(Boolean, default=False)         # NEW: moderation flag
+    priority = Column(String, default="normal")          # normal, important, urgent
+    mentions = Column(Text, nullable=True)               # JSON list of mentioned user IDs
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
 
@@ -184,3 +186,32 @@ class BlockedUser(Base):
 
     blocker = relationship("User", back_populates="blocked_users", foreign_keys=[blocker_id])
     blocked = relationship("User", back_populates="blocked_by", foreign_keys=[blocked_id])
+
+
+class Poll(Base):
+    __tablename__ = "polls"
+
+    id = Column(String, primary_key=True, default=gen_uuid)
+    message_id = Column(String, ForeignKey("messages.id"), nullable=False, index=True)
+    question = Column(Text, nullable=False)
+    options = Column(Text, nullable=False)       # JSON array of option strings
+    is_anonymous = Column(Boolean, default=False)
+    allow_multiple = Column(Boolean, default=False)
+    created_by = Column(String, ForeignKey("users.id"), nullable=False)
+    created_at = Column(DateTime, server_default=func.now())
+    expires_at = Column(DateTime, nullable=True)
+
+    votes = relationship("PollVote", back_populates="poll")
+    creator = relationship("User", foreign_keys=[created_by])
+
+
+class PollVote(Base):
+    __tablename__ = "poll_votes"
+
+    id = Column(String, primary_key=True, default=gen_uuid)
+    poll_id = Column(String, ForeignKey("polls.id"), nullable=False, index=True)
+    user_id = Column(String, ForeignKey("users.id"), nullable=False, index=True)
+    option_index = Column(Integer, nullable=False)
+    created_at = Column(DateTime, server_default=func.now())
+
+    poll = relationship("Poll", back_populates="votes")

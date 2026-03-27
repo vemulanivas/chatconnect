@@ -2267,6 +2267,26 @@ body.dark-mode .date-divider span {
   flex-direction: row-reverse;
 }
 
+/* Priority message styling */
+.message.message-urgent .message-bubble {
+  border-left: 3px solid #ef4444;
+  animation: urgentPulse 2s infinite;
+}
+
+.message.message-important .message-bubble {
+  border-left: 3px solid #f59e0b;
+}
+
+@keyframes urgentPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.15); }
+  50% { box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.1); }
+}
+
+/* @Mention highlight in messages */
+.message-text strong {
+  color: var(--primary-color);
+}
+
 /* ── Premium Call Message Styling ── */
 .message.call-message .message-content {
   max-width: 75%;
@@ -6418,4 +6438,32 @@ body {
     user-select: none;
     -webkit-user-select: none;
   }
+}
+/* Mention Styling */
+.mention-span {
+  background: rgba(0, 132, 255, 0.12);
+  color: #0084ff;
+  padding: 0px 4px;
+  border-radius: 4px;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-block;
+  box-shadow: 0 0 0 1px rgba(0, 132, 255, 0.05);
+}
+.dark-mode .mention-span {
+  background: rgba(88, 166, 255, 0.2);
+  color: #58a6ff;
+  border: none;
+}
+
+/* Fix Mention Mixing in Blue Bubbles */
+.message-item.own .mention-span {
+  background: rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.4);
+  font-weight: 700;
+}
+.message-item:not(.own) .mention-span {
+  background: rgba(0, 132, 255, 0.1);
+  color: #0084ff;
 }

@@ -54,6 +54,34 @@ def get_users(db: Session = Depends(get_db), current_user: User = Depends(get_cu
     ]
 
 
+@router.get("/search")
+def search_users(q: str = "", db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    """Search users by full name for starting new conversations."""
+    if not q or len(q.strip()) < 1:
+        return []
+    
+    blocked = db.query(BlockedUser).filter(
+        BlockedUser.blocker_id == current_user.id
+    ).all()
+    blocked_ids = set(b.blocked_id for b in blocked)
+    
+    from sqlalchemy import func, or_
+    search_q = f"%{q.strip().lower()}%"
+    users = db.query(User).filter(
+        User.id != current_user.id,
+        or_(
+            func.lower(func.coalesce(User.full_name, '')).like(search_q),
+            func.lower(func.coalesce(User.username, '')).like(search_q)
+        )
+    ).limit(20).all()
+    
+    return [
+        {**user_to_dict(u), "isBlocked": u.id in blocked_ids}
+        for u in users
+        if u.id not in blocked_ids
+    ]
+
+
 class UpdateProfileRequest(BaseModel):
     full_name: str = None
     bio: str = None

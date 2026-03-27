@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import apiClient from '../utils/apiClient';
 
 function ChatSidebar({
   currentUser, users, channels, conversations, activeConversation,
@@ -14,12 +15,34 @@ function ChatSidebar({
   const [contextMenu, setContextMenu] = useState(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deletedConvIds, setDeletedConvIds] = useState([]);
+  const [searchResults, setSearchResults] = useState([]);
+  const [isSearching, setIsSearching] = useState(false);
 
   React.useEffect(() => {
     const handleClick = () => setContextMenu(null);
     document.addEventListener('click', handleClick);
     return () => document.removeEventListener('click', handleClick);
   }, []);
+
+  // Search users from backend when search query changes
+  useEffect(() => {
+    if (!searchQuery || searchQuery.trim().length < 1) {
+      setSearchResults([]);
+      setIsSearching(false);
+      return;
+    }
+    setIsSearching(true);
+    const timer = setTimeout(async () => {
+      try {
+        const results = await apiClient.searchUsers(searchQuery.trim());
+        setSearchResults(results || []);
+      } catch (e) {
+        setSearchResults([]);
+      }
+      setIsSearching(false);
+    }, 150); // Faster debounce: 150ms
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
   // ── Helpers ──────────────────────────────────────────────────────────────
 
@@ -91,9 +114,17 @@ function ChatSidebar({
       .trim();
   }
 
+  // Get users who have existing conversations with the current user
+  const usersWithConversations = (users || [])
+    .filter(u => u && u.id !== currentUser?.id)
+    .filter(u => !isUserBlocked || !isUserBlocked(u.id))
+    .filter(u => {
+      const conv = getConversationForUser(u.id);
+      return conv && !deletedConvIds.includes(conv.id);
+    });
+
   // Total unread across all DMs (for tab badge)
-  const totalDmUnread = users
-    .filter(u => u.id !== currentUser?.id && !isUserBlocked(u.id))
+  const totalDmUnread = usersWithConversations
     .reduce((sum, u) => {
       const conv = getConversationForUser(u.id);
       return sum + (conv ? (unreadCounts[conv.id] || 0) : 0);
@@ -104,11 +135,21 @@ function ChatSidebar({
 
   // ── Filtered + sorted lists ──────────────────────────────────────────────
 
-  const filteredUsers = users
-    .filter(u => u.id !== currentUser?.id)
-    .filter(u => !isUserBlocked(u.id))
-    .filter(u => u.fullName.toLowerCase().includes(searchQuery.toLowerCase()))
+  // Only show users who have existing conversations (filter by name if searching)
+  const filteredUsers = usersWithConversations
+    .filter(u => {
+      if (!searchQuery) return true;
+      const q = searchQuery.toLowerCase();
+      const name = (u.fullName || '').toLowerCase();
+      const username = (u.username || '').toLowerCase();
+      return name.includes(q) || username.includes(q);
+    })
     .sort((a, b) => getSortTime(b.id) - getSortTime(a.id));
+
+  // Search results: only show users NOT already in conversations list  
+  const newUserResults = (searchResults || []).filter(sr => 
+    !usersWithConversations.some(u => u.id === sr.id)
+  );
 
   const filteredChannels = channels
     .filter(c => c.name?.toLowerCase().includes(searchQuery.toLowerCase()))
@@ -259,14 +300,65 @@ function ChatSidebar({
       </div>
 
       <div className="sidebar-content">
+        
+        {/* GLOBAL SEARCH RESULTS (Visible across all tabs when searching) */}
+        {searchQuery && (
+          <div className="search-results-section" style={{ borderBottom: '2px solid var(--border-color)', marginBottom: '8px', paddingBottom: '8px' }}>
+            {isSearching && (
+              <div style={{ padding: '12px 16px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '13px' }}>
+                <i className="fas fa-spinner fa-spin" style={{ marginRight: '6px' }}></i> Searching...
+              </div>
+            )}
+            
+            {newUserResults.length > 0 && (
+              <>
+                <div style={{ padding: '8px 16px', fontSize: '11px', fontWeight: 700, color: 'var(--primary-color)', textTransform: 'uppercase' }}>
+                  People and Groups
+                </div>
+                {newUserResults.map(user => (
+                   <div key={user.id} className="conversation-item active-search" onClick={() => { onUserClick(user); setSearchQuery(''); }}>
+                     <div className="conversation-avatar-wrapper">
+                       <img src={user.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.fullName || user.username)}&background=667eea&color=fff`} alt={user.fullName} />
+                       <span className={`status-dot ${user.status || 'offline'}`}></span>
+                     </div>
+                     <div className="conversation-info">
+                       <h4>{user.fullName || user.username}</h4>
+                       <p className="conversation-preview" style={{ color: 'var(--primary-color)' }}>New Contact (Click to Chat)</p>
+                     </div>
+                   </div>
+                ))}
+              </>
+            )}
+
+            {!isSearching && newUserResults.length === 0 && filteredUsers.length === 0 && (
+               <div style={{ padding: '24px 16px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                 No people found for "{searchQuery}"
+               </div>
+            )}
+          </div>
+        )}
 
         {/* ── DMs ── */}
         {activeTab === 'dms' && (
           <div className="conversation-list">
-            {filteredUsers.length === 0 && (
+            
+            {searchQuery && filteredUsers.length > 0 && (
+              <div style={{ padding: '8px 16px', fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
+                Matching Recent Chats
+              </div>
+            )}
+
+            {searchQuery && !isSearching && filteredUsers.length === 0 && newUserResults.length === 0 && (
               <div style={{ padding: '32px 16px', textAlign: 'center', color: 'var(--text-secondary)' }}>
-                <i className="fas fa-comment-slash" style={{ fontSize: '32px', marginBottom: '12px', opacity: 0.3 }}></i>
-                <p style={{ margin: 0, fontSize: '14px' }}>No chats yet.<br />Click a user to start one.</p>
+                <i className="fas fa-user-slash" style={{ fontSize: '32px', marginBottom: '12px', opacity: 0.3 }}></i>
+                <p style={{ margin: 0, fontSize: '14px' }}>No users found for "{searchQuery}"</p>
+              </div>
+            )}
+            
+            {filteredUsers.length === 0 && !searchQuery && (
+              <div style={{ padding: '32px 16px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                <i className="fas fa-search" style={{ fontSize: '32px', marginBottom: '12px', opacity: 0.3 }}></i>
+                <p style={{ margin: 0, fontSize: '14px' }}>No chats yet.<br />Search for a user by name above to start chatting.</p>
               </div>
             )}
             {filteredUsers.map((user, index) => {

@@ -19,6 +19,7 @@ import GroupCallModal from '../components/GroupCallModal';
 import CallHistoryPanel from '../components/CallHistoryPanel';
 import BlockedUsersModal from '../components/BlockedUsersModal';
 import IncomingCallModal from '../components/IncomingCallModal';
+import PollCreator from '../components/PollCreator';
 
 function ChatPage() {
   const navigate = useNavigate();
@@ -104,6 +105,9 @@ function ChatPage() {
   const [incomingCallData, setIncomingCallData] = useState(null);
   const [replyingToMessage, setReplyingToMessage] = useState(null);
   const [forwardingMessage, setForwardingMessage] = useState(null);
+  const [messagePriority, setMessagePriority] = useState('normal');
+  const [messageMentions, setMessageMentions] = useState([]);
+  const [showPollCreator, setShowPollCreator] = useState(false);
   const callTimerRef = useRef(null);
 
   // Refs
@@ -515,11 +519,16 @@ function ChatPage() {
           showSuccess('Message updated', 'Message');
         }
       } else {
+        const metadata = {
+          ...(replyingToMessage ? { reply_to_id: replyingToMessage.id } : {}),
+          priority: messagePriority || 'normal',
+          mentions: messageMentions || []
+        };
         const result = await sendMessage(
           activeConversation.id,
           messageInput,
           'text',
-          replyingToMessage ? { reply_to_id: replyingToMessage.id } : {}
+          metadata
         );
         if (result && result.success && result.message) {
           sendEvent({
@@ -533,8 +542,28 @@ function ChatPage() {
       setMessageInput('');
       setReplyingToMessage(null);
       setShowEmojiPicker(false);
+      setMessagePriority('normal');
+      setMessageMentions([]);
     } catch (error) {
       console.error('Error sending message:', error);
+    }
+  };
+
+  const handleCreatePoll = async (question, options, isAnonymous, allowMultiple) => {
+    if (!activeConversation) return;
+    try {
+      const result = await apiClient.createPoll(activeConversation.id, question, options, isAnonymous, allowMultiple);
+      if (result) {
+        sendEvent({
+          type: 'message',
+          message: result,
+          targetUserIds: activeConversation.participants.map(p => String(p.id || p)).filter(id => id !== String(currentUser.id))
+        });
+        setShowPollCreator(false);
+        loadData();
+      }
+    } catch (error) {
+      console.error('Error creating poll:', error);
     }
   };
 
@@ -1274,6 +1303,15 @@ function ChatPage() {
                   const typingUser = getUserById(typingUserId);
                   return typingUser?.avatar || null;
                 })()}
+                onVotePoll={async (pollId, optionIndex) => {
+                  try {
+                    await apiClient.votePoll(pollId, optionIndex);
+                    // Reload messages to get updated poll data
+                    loadData();
+                  } catch (e) {
+                    console.error('Vote error:', e);
+                  }
+                }}
               />
 
               <ChatInput
@@ -1295,8 +1333,41 @@ function ChatPage() {
                 }}
                 replyingTo={replyingToMessage}
                 onCancelReply={() => setReplyingToMessage(null)}
+                participants={activeConversation?.participants || []}
+                users={users} /* Pass all users for global mentions */
+                currentUser={currentUser}
+                priority={messagePriority}
+                onPriorityChange={setMessagePriority}
+                mentions={messageMentions}
+                onMentionsChange={setMessageMentions}
               />
+              {/* Poll creation button */}
+              <div style={{ display: 'flex', alignItems: 'center', padding: '2px 8px', gap: '6px' }}>
+                <button
+                  onClick={() => setShowPollCreator(true)}
+                  title="Create Poll"
+                  style={{
+                    background: 'none', border: 'none', cursor: 'pointer',
+                    color: 'var(--text-muted)', fontSize: '13px', padding: '4px 8px',
+                    borderRadius: '6px', transition: 'all 0.15s',
+                    display: 'flex', alignItems: 'center', gap: '4px'
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.background = 'var(--bg-secondary)'; e.currentTarget.style.color = 'var(--primary-color)'; }}
+                  onMouseLeave={e => { e.currentTarget.style.background = 'none'; e.currentTarget.style.color = 'var(--text-muted)'; }}
+                >
+                  <i className="fas fa-poll" style={{ fontSize: '12px' }}></i>
+                  <span>Poll</span>
+                </button>
+              </div>
             </div>
+          )}
+
+          {/* Poll Creator Modal */}
+          {showPollCreator && (
+            <PollCreator
+              onCreatePoll={handleCreatePoll}
+              onCancel={() => setShowPollCreator(false)}
+            />
           )}
         </main>
 

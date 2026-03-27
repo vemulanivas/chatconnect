@@ -160,6 +160,24 @@ const CustomAudioPlayer = ({ message, toggleAudioPlayback, playingAudioId, wavef
   );
 };
 
+// Render @mentions as styled spans within message content
+function renderMentions(content, mentions, users) {
+  if (!content || !mentions || (Array.isArray(mentions) && mentions.length === 0)) return content;
+  let result = content;
+  const mentionList = Array.isArray(mentions) ? mentions : [];
+  
+  mentionList.forEach(userId => {
+    const user = users.find(u => u.id === userId);
+    if (user) {
+      const name = user.fullName || user.username;
+      // Convert name mention to a markdown link with a special "mention" protocol
+      const regex = new RegExp(`@${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'gi');
+      result = result.replace(regex, `[@${name}](mention:${userId})`);
+    }
+  });
+  return result;
+}
+
 function ChatMessages({
   messages,
   currentUser,
@@ -172,6 +190,7 @@ function ChatMessages({
   onReplyMessage,
   onForwardMessage,
   onBookmarkMessage,
+  onVotePoll,
   formatTime,
   formatDate,
   formatFileSize,
@@ -256,7 +275,7 @@ function ChatMessages({
             )}
             <div
               id={`msg-${message.id}`}
-              className={`message ${isOwnMessage ? 'sent' : 'received'} ${message.type === 'call' ? 'call-message' : ''}`}
+              className={`message ${isOwnMessage ? 'sent' : 'received'} ${message.type === 'call' ? 'call-message' : ''} ${message.priority === 'urgent' ? 'message-urgent' : ''} ${message.priority === 'important' ? 'message-important' : ''}`}
               style={{ animationDelay: `${index * 0.05}s` }}
             >
               {!isOwnMessage && activeConversation?.type === 'channel' && (
@@ -276,7 +295,7 @@ function ChatMessages({
 
                 <div className="message-bubble">
                   {(() => {
-                    const parentId = message.replyToMessageId || message.reply_to_id;
+                    const parentId = message.replyToMessageId || message.replyToId || message.reply_to_id;
                     if (!parentId) return null;
                     const parentMsg = messages.find(m => String(m.id) === String(parentId));
                     return (
@@ -353,9 +372,90 @@ function ChatMessages({
                         </span>
                       </div>
                     </div>
+                  ) : message.type === 'poll' && message.poll ? (
+                    <div style={{ minWidth: '260px', maxWidth: '360px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
+                        <span style={{ fontSize: '1.3em' }}>📊</span>
+                        <span style={{ fontWeight: 700, fontSize: '0.95em' }}>{message.poll.question}</span>
+                      </div>
+                      {message.poll.options.map((opt) => {
+                        const hasVoted = opt.voters?.some(v => v.userId === currentUser?.id);
+                        return (
+                          <button
+                            key={opt.index}
+                            onClick={() => onVotePoll && onVotePoll(message.poll.id, opt.index)}
+                            style={{
+                              width: '100%',
+                              padding: '8px 12px',
+                              marginBottom: '6px',
+                              border: hasVoted ? '2px solid var(--primary-color)' : '1px solid var(--border-color)',
+                              borderRadius: '8px',
+                              background: 'transparent',
+                              cursor: 'pointer',
+                              textAlign: 'left',
+                              position: 'relative',
+                              overflow: 'hidden',
+                              color: isOwnMessage ? '#fff' : 'var(--text-primary)',
+                              fontSize: '0.85em',
+                              transition: 'all 0.15s',
+                              fontWeight: hasVoted ? 600 : 400,
+                            }}
+                          >
+                            {/* Progress bar background */}
+                            <div style={{
+                              position: 'absolute',
+                              top: 0,
+                              left: 0,
+                              height: '100%',
+                              width: `${opt.percentage}%`,
+                              background: hasVoted ? 'rgba(0,132,255,0.2)' : (isOwnMessage ? 'rgba(255,255,255,0.1)' : 'rgba(0,132,255,0.08)'),
+                              transition: 'width 0.3s ease',
+                              borderRadius: '8px',
+                            }} />
+                            <div style={{ position: 'relative', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <span>{opt.text}</span>
+                              <span style={{ fontSize: '0.85em', opacity: 0.7, fontWeight: 600 }}>
+                                {opt.percentage}%
+                              </span>
+                            </div>
+                          </button>
+                        );
+                      })}
+                      <div style={{ fontSize: '0.75em', opacity: 0.6, marginTop: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span>{message.poll.totalVotes} {message.poll.totalVotes === 1 ? 'vote' : 'votes'}</span>
+                        {message.poll.isAnonymous && <span>• Anonymous</span>}
+                        {message.poll.allowMultiple && <span>• Multiple choice</span>}
+                      </div>
+                    </div>
                   ) : (
                     <div className="message-text">
-                      <ReactMarkdown>{message.content}</ReactMarkdown>
+                      {message.priority && message.priority !== 'normal' && (
+                        <span style={{
+                          fontSize: '0.75em',
+                          fontWeight: 700,
+                          padding: '1px 6px',
+                          borderRadius: '4px',
+                          marginBottom: '4px',
+                          display: 'inline-block',
+                          ...(message.priority === 'urgent' 
+                            ? { background: 'rgba(239,68,68,0.15)', color: '#ef4444' }
+                            : { background: 'rgba(245,158,11,0.15)', color: '#f59e0b' })
+                        }}>
+                          {message.priority === 'urgent' ? '🔴 URGENT' : '❗ IMPORTANT'}
+                        </span>
+                      )}
+                      <ReactMarkdown 
+                        components={{
+                          a: ({node, href, children, ...props}) => {
+                            if (href?.startsWith('mention:')) {
+                              return <span className="mention-span">{children}</span>;
+                            }
+                            return <a href={href} {...props}>{children}</a>;
+                          }
+                        }}
+                      >
+                        {renderMentions(message.content, message.mentions, users)}
+                      </ReactMarkdown>
                     </div>
                   )}
                 </div>
@@ -385,6 +485,29 @@ function ChatMessages({
                       </button>
                     ))}
                   </div>
+                )}
+
+                {/* Thread reply count */}
+                {message.replyCount > 0 && (
+                  <button
+                    onClick={() => onReplyMessage(message)}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      color: 'var(--primary-color)',
+                      fontSize: '0.8em',
+                      fontWeight: 600,
+                      padding: '2px 0',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      marginTop: '2px'
+                    }}
+                  >
+                    <i className="fas fa-comments" style={{ fontSize: '0.85em' }}></i>
+                    {message.replyCount} {message.replyCount === 1 ? 'reply' : 'replies'}
+                  </button>
                 )}
               </div>
 
